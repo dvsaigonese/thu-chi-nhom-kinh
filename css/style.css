@@ -1,0 +1,56 @@
+/* css/style.css */
+
+/* Định nghĩa màu thương hiệu Teal (Xanh nước biển đậm) */
+:root {
+    --bs-primary: #0c343d; /* Ghi đè màu Primary mặc định của Bootstrap */
+    --bs-primary-rgb: 12, 52, 61;
+}
+
+.bg-teal { background-color: #0c343d; }
+.text-teal { color: #0c343d; }
+.btn-teal { background-color: #0c343d; color: white; border: none; }
+.btn-teal:hover { background-color: #08242a; color: white; }
+.btn-outline-teal { border-color: #0c343d; color: #0c343d; }
+.btn-outline-teal:hover { background-color: #0c343d; color: white; }
+
+/* Tiện ích font chữ */
+.font-weight-bold { font-weight: 600; }
+.fs-7 { font-size: 0.85rem; }
+
+/* SPA: Ẩn/Hiện các trang */
+.page { display: none; }
+.page.active { display: block; animation: fadeIn 0.2s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+/* HEADER FIX CHO MOBILE */
+header h1 { 
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+    padding: 0 10px; 
+}
+
+/* DASHBOARD MENU (HOME) */
+.tool-card { transition: all 0.2s; cursor: pointer; }
+.tool-card:active { transform: scale(0.95); background-color: #f8f9fa; } /* Hiệu ứng nhấn trên điện thoại */
+.tool-icon-circle { 
+    width: 60px; height: 60px; 
+    border-radius: 50%; 
+    display: flex; align-items: center; justify-content: center; 
+}
+
+/* FORM TINH CHỈNH CHO MOBILE */
+/* Tăng độ lớn của các ô nhập liệu (Large size) để dễ chạm tay */
+.form-control-lg, .form-select-lg { font-size: 1rem; padding: 12px 15px; }
+.form-label { margin-bottom: 3px; font-size: 0.9rem; color: #555; }
+
+/* BẢNG ĐIỀU CHỈNH CHO MOBILE */
+.table-responsive {
+    -webkit-overflow-scrolling: touch; /* Giúp cuộn mượt hơn trên iPhone */
+}
+/* Giảm padding của bảng dạng nhỏ (sm) để chứa được nhiều chữ hơn */
+.table-sm th, .table-sm td { padding: 8px 5px; }
+
+/* Định dạng cột tiền tệ */
+.text-end { text-align: right !important; }
+.table font-weight-bold-money { font-weight: 600; font-family: 'Courier New', Courier, monospace; } /* Dễ đọc số */
