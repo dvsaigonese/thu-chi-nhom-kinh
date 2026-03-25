@@ -404,10 +404,14 @@
                         </div>
                         
                         <div class="col-12" id="bg-history-container" style="display: none;">
-                            <div class="p-3 bg-light border border-info border-opacity-25 rounded-3">
-                                <h6 class="text-info fs-7 fw-bold mb-2"><i class="bi bi-clock-history me-1"></i>Đã tìm thấy báo giá cũ của khách này:</h6>
-                                <div id="bg-history-list" class="d-flex flex-wrap gap-2">
-                                    </div>
+                            <div class="p-3 bg-light border border-info border-opacity-25 rounded-3 shadow-sm">
+                                <h6 class="text-info fs-7 fw-bold mb-2"><i class="bi bi-clock-history me-1"></i>Lịch sử báo giá của khách này:</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover mb-0 bg-white border">
+                                        <tbody id="bg-history-list">
+                                            </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -441,9 +445,18 @@
                         </div>
                     </div>
 
-                    <button id="btn-save-baogia" class="btn btn-primary btn-lg w-100 fw-bold shadow-sm" onclick="BaogiaModule.saveAndExport()">
-                        <i class="bi bi-file-earmark-arrow-down me-2"></i>LƯU & XUẤT FILE PDF
-                    </button>
+                    <div class="row g-2 mt-2">
+                        <div class="col-12 col-md-8">
+                            <button id="btn-save-baogia" class="btn btn-primary btn-lg w-100 fw-bold shadow-sm" onclick="BaogiaModule.saveAndExport()">
+                                <i class="bi bi-file-earmark-arrow-down me-2"></i>LƯU & XUẤT FILE PDF
+                            </button>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <button id="btn-new-baogia" class="btn btn-success btn-lg w-100 fw-bold shadow-sm" style="display: none;" onclick="BaogiaModule.resetForm()">
+                                <i class="bi bi-plus-circle me-2"></i>TẠO BÁO GIÁ MỚI
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 

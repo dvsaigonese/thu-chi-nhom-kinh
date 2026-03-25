@@ -3,18 +3,36 @@
 const BaogiaModule = {
     rowCount: 0,
     currentHistory: [],
+    historyDisplayCount: 5, // Bộ đếm số lượng hiển thị lịch sử
 
     load: async function() {
         document.getElementById('bg-khachhang').value = '';
         document.getElementById('bg-ghichu').value = '';
         document.getElementById('tbody-baogia').innerHTML = '';
         document.getElementById('bg-history-container').style.display = 'none';
+        
+        const btnSave = document.getElementById('btn-save-baogia');
+        const btnNew = document.getElementById('btn-new-baogia');
+        if (btnSave) {
+            btnSave.innerHTML = '<i class="bi bi-file-earmark-arrow-down me-2"></i>LƯU & XUẤT FILE PDF';
+            btnSave.classList.remove('btn-success');
+            btnSave.classList.add('btn-primary');
+            btnSave.disabled = false;
+        }
+        if (btnNew) btnNew.style.display = 'none';
+
         this.updateTotal();
         this.addRow();
 
         if (!App.State.setupData) {
             let res = await API.request('GET', 'read', 'SETUP');
             if(res.status === 'success') App.State.setupData = res.data;
+        }
+    },
+
+    resetForm: function() {
+        if(confirm('⚠️ Bạn muốn xóa trắng form hiện tại để làm báo giá mới?')) {
+            this.load();
         }
     },
 
@@ -45,45 +63,96 @@ const BaogiaModule = {
         this.fetchHistory(name);
     },
 
-    // ĐÃ NÂNG CẤP: KHÔNG BAO GIỜ BIẾN MẤT, CÓ LỖI LÀ BÁO ĐỎ!
+    // --- TÁCH HÀM LẤY LỊCH SỬ ---
     fetchHistory: async function(khachHang) {
         const container = document.getElementById('bg-history-container');
         const listEl = document.getElementById('bg-history-list');
         
-        listEl.innerHTML = '<span class="spinner-border spinner-border-sm text-info"></span> <span class="text-info">Đang lục tìm trong Sổ...</span>';
-        container.style.display = 'block'; // Luôn luôn hiện khung
+        listEl.innerHTML = '<div class="text-info p-2"><span class="spinner-border spinner-border-sm"></span> Đang lục tìm trong Sổ...</div>';
+        container.style.display = 'block';
 
         try {
-            // Lệnh kết nối lên mây
             let res = await API.request('POST', 'getBaoGiaHistory', 'BAO_GIA', { khachHang: khachHang });
             
-            // Nếu Google Sheets ném ra lỗi (Ví dụ: kẹt dòng rác)
             if (res.status === 'error') {
-                listEl.innerHTML = `<span class="text-danger fw-bold"><i class="bi bi-exclamation-triangle"></i> Lỗi máy chủ Google: ${res.message}</span>`;
+                listEl.innerHTML = `<div class="text-danger fw-bold p-2">Lỗi máy chủ: ${res.message}</div>`;
                 return;
             }
             
-            // Nếu thành công và có số liệu
             if (res.status === 'success' && res.data && res.data.length > 0) {
                 this.currentHistory = res.data;
-                let html = '';
-                res.data.forEach((bg, index) => {
-                    let ngayStr = bg.ngay;
-                    if(ngayStr && String(ngayStr).includes('T')) {
-                        ngayStr = new Date(ngayStr).toLocaleDateString('vi-VN');
-                    }
-                    html += `<button class="btn btn-outline-info btn-sm bg-white" onclick="BaogiaModule.loadOldQuote(${index})" title="${bg.ghiChu}">
-                                ${ngayStr} - ${Number(bg.tongTien).toLocaleString('vi-VN')}đ
-                             </button>`;
-                });
-                listEl.innerHTML = html;
+                this.historyDisplayCount = 5; // Reset về 5 mỗi khi tìm khách mới
+                this.renderHistoryList(); // Gọi hàm vẽ giao diện
             } else {
-                // Nếu tìm không thấy khách
-                listEl.innerHTML = '<span class="text-muted"><i class="bi bi-info-circle"></i> Khách hàng này chưa có báo giá cũ.</span>';
+                listEl.innerHTML = '<div class="text-muted p-2"><i class="bi bi-info-circle"></i> Khách hàng này chưa có báo giá cũ.</div>';
             }
         } catch (err) {
-            // Lỗi đứt cáp mạng
-            listEl.innerHTML = `<span class="text-danger fw-bold"><i class="bi bi-wifi-off"></i> Lỗi kết nối mạng: ${err.message}</span>`;
+            listEl.innerHTML = `<div class="text-danger fw-bold p-2">Lỗi kết nối: ${err.message}</div>`;
+        }
+    },
+
+    // --- HÀM CHỊU TRÁCH NHIỆM VẼ GIAO DIỆN & TẠO NÚT XEM THÊM ---
+    renderHistoryList: function() {
+        const listEl = document.getElementById('bg-history-list');
+        let html = '<div class="w-100">';
+        
+        // Chỉ lấy tối đa số lượng theo giới hạn
+        let limit = Math.min(this.historyDisplayCount, this.currentHistory.length);
+        
+        for (let index = 0; index < limit; index++) {
+            let bg = this.currentHistory[index];
+            let ngayGio = bg.ngay;
+            
+            if(ngayGio && String(ngayGio).includes('T')) {
+                let d = new Date(ngayGio);
+                ngayGio = d.toLocaleDateString('vi-VN') + ' ' + d.toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'});
+            }
+            
+            html += `
+            <div class="w-100 d-flex justify-content-between align-items-center p-2 border rounded bg-white mb-2 shadow-sm">
+                <div>
+                    <div class="fs-7 text-muted"><i class="bi bi-clock me-1"></i>${ngayGio}</div>
+                    <div class="fw-bold text-danger">${Number(bg.tongTien).toLocaleString('vi-VN')} đ</div>
+                </div>
+                <div class="text-nowrap">
+                    <button class="btn btn-sm btn-outline-primary py-1 px-2" onclick="BaogiaModule.loadOldQuote(${index})" title="Nạp vào Form để sửa"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-outline-success py-1 px-2 mx-1" onclick="BaogiaModule.viewOldPDF(${index})" title="Xem/Tải lại file PDF"><i class="bi bi-file-earmark-pdf"></i></button>
+                    <button class="btn btn-sm btn-outline-danger py-1 px-2" onclick="BaogiaModule.deleteQuote(${bg._rowIndex})" title="Xóa bỏ"><i class="bi bi-trash"></i></button>
+                </div>
+            </div>`;
+        }
+        html += '</div>';
+
+        // Nếu vẫn còn báo giá bị ẩn, hiện nút "Xem thêm"
+        let soLuongConLai = this.currentHistory.length - this.historyDisplayCount;
+        if (soLuongConLai > 0) {
+            html += `
+            <div class="text-center mt-2">
+                <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm" onclick="BaogiaModule.loadMoreHistory()">
+                    <i class="bi bi-chevron-down me-1"></i>Xem thêm (${soLuongConLai} báo giá cũ)
+                </button>
+            </div>`;
+        }
+
+        listEl.innerHTML = html;
+    },
+
+    // Khi bấm nút "Xem thêm", cộng dồn giới hạn lên 5 và vẽ lại
+    loadMoreHistory: function() {
+        this.historyDisplayCount += 5;
+        this.renderHistoryList();
+    },
+
+    deleteQuote: async function(rowIndex) {
+        if(!rowIndex) return alert("Lỗi: Không tìm thấy ID dòng để xóa.");
+        if(!confirm("⚠️ Bạn có chắc chắn muốn xóa vĩnh viễn báo giá này khỏi lịch sử không?")) return;
+        
+        let res = await API.request('POST', 'delete', 'BAO_GIA', null, rowIndex);
+        if(res.status === 'success') {
+            const khachHang = document.getElementById('bg-khachhang').value.trim();
+            this.fetchHistory(khachHang);
+        } else {
+            alert("Lỗi xóa: " + res.message);
         }
     },
 
@@ -98,25 +167,16 @@ const BaogiaModule = {
         let itemsList = [];
         try {
             let rawData = bg.items;
-            if (!rawData) {
-                itemsList = [];
-            } else if (typeof rawData === 'object') {
-                itemsList = rawData; 
-            } else {
+            if (!rawData) itemsList = [];
+            else if (typeof rawData === 'object') itemsList = rawData; 
+            else {
                 rawData = String(rawData).trim();
-                if (rawData.includes('%5B')) {
-                    rawData = decodeURIComponent(rawData);
-                }
+                if (rawData.startsWith("'")) rawData = rawData.substring(1);
                 rawData = rawData.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
-                try {
-                    itemsList = JSON.parse(rawData);
-                } catch(e1) {
-                    console.warn("Đang dùng giải pháp ép kiểu mạnh...");
-                    itemsList = (new Function("return " + rawData))();
-                }
+                try { itemsList = JSON.parse(rawData); } 
+                catch(e1) { itemsList = (new Function("return " + rawData))(); }
             }
         } catch(e) {
-            alert("Lỗi đọc dữ liệu vật tư: " + e.message);
             itemsList = [];
         }
         
@@ -134,9 +194,8 @@ const BaogiaModule = {
                 }
             });
         }
-        
         this.updateTotal();
-        alert(`✅ Đã nạp lại Báo giá ngày ${bg.ngay}. Bạn có thể chỉnh sửa ngay bây giờ!`);
+        alert(`✅ Đã nạp lại dữ liệu thành công!`);
     },
 
     addRow: function() {
@@ -214,6 +273,148 @@ const BaogiaModule = {
         return str.charAt(0).toUpperCase() + str.slice(1) + " đồng.";
     },
 
+    generatePDFHTML: function(khachHang, ngayInPDF, tongTien, items, ghiChu) {
+        let trHtml = '';
+        for (let i = 0; i < 8; i++) {
+            let isEven = i % 2 !== 0; 
+            let bgColor = isEven ? '#f5f5f5' : '#ffffff';
+            let item = items[i];
+
+            if (item) {
+                let thanhTien = item.qty * item.price;
+                trHtml += `
+                    <tr style="background-color: ${bgColor}; font-size: 13px; color: #555;">
+                        <td style="padding: 8px; text-align: center;">${i + 1}</td>
+                        <td style="padding: 8px; font-weight: bold;">${item.name}</td>
+                        <td style="padding: 8px; text-align: center;">${item.dvt}</td>
+                        <td style="padding: 8px; text-align: center;">${item.qty.toLocaleString('vi-VN')}</td>
+                        <td style="padding: 8px; text-align: right;">${item.price.toLocaleString('vi-VN')}</td>
+                        <td style="padding: 8px; text-align: right;">${thanhTien.toLocaleString('vi-VN')}</td>
+                    </tr>`;
+            } else {
+                trHtml += `
+                    <tr style="background-color: ${bgColor}; height: 32px;">
+                        <td style="padding: 8px; text-align: center; color: #999;">${i + 1}</td>
+                        <td></td><td></td><td></td><td></td><td></td>
+                    </tr>`;
+            }
+        }
+
+        const tienBangChu = this.docSoThanhChu(tongTien);
+        
+        let htmlGhiChu = ghiChu ? `
+            <div style="margin-top: 10px; font-size: 13px; color: #333; padding: 10px; border: 1px dashed #ccc; background: #fafafa;">
+                <b style="color: #283593;">Ghi chú:</b><br>${String(ghiChu).replace(/\n/g, '<br>')}
+            </div>
+        ` : '';
+
+        return `
+            <div style="padding: 30px; font-family: 'Segoe UI', Arial, sans-serif; background: white; box-sizing: border-box;">
+                <div style="border-top: 8px solid #3f51b5; margin-bottom: 20px;"></div>
+                
+                <div style="margin-bottom: 25px;">
+                    <h2 style="color: #5c6bc0; font-size: 20px; margin: 0 0 5px 0; font-weight: 600;">ĐƠN VỊ THI CÔNG XÂY DỰNG THANH SƠN</h2>
+                    <p style="color: #777; font-size: 12px; margin: 0; line-height: 1.5;">
+                        362, Quốc Lộ 13<br>Lộc Ninh, Bình Phước<br>Phone/Zalo: 0974031035
+                    </p>
+                </div>
+
+                <h1 style="color: #283593; font-size: 28px; font-weight: 700; margin-bottom: 20px;">Bảng giá các hạng mục thi công</h1>
+
+                <div style="margin-bottom: 15px;">
+                    <div style="font-weight: 700; font-size: 13px; color: #333;">Khách hàng</div>
+                    <div style="font-size: 13px; color: #777;">${khachHang}</div>
+                </div>
+
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid #ddd; color: #283593; font-size: 13px;">
+                            <th style="padding: 10px 8px; text-align: center; width: 5%;">STT</th>
+                            <th style="padding: 10px 8px; text-align: left; width: 40%;">Nội dung</th>
+                            <th style="padding: 10px 8px; text-align: center; width: 10%;">ĐVT</th>
+                            <th style="padding: 10px 8px; text-align: center; width: 10%;">SL</th>
+                            <th style="padding: 10px 8px; text-align: right; width: 15%;">Đơn giá (*)</th>
+                            <th style="padding: 10px 8px; text-align: right; width: 20%;">Thành tiền</th>
+                        </tr>
+                    </thead>
+                    <tbody>${trHtml}</tbody>
+                </table>
+
+                <div style="text-align: right; padding: 10px 0; border-bottom: 1px solid #ddd; margin-bottom: 15px;">
+                    <span style="font-size: 24px; font-weight: bold; color: #e91e63;">${tongTien.toLocaleString('vi-VN')}</span>
+                </div>
+
+                <div style="font-size: 12px; color: #333; margin-bottom: 20px;">
+                    <p style="margin: 0 0 5px 0;">(*) Đơn giá chưa bao gồm thuế VAT</p>
+                    <p style="color: #283593; font-weight: bold; margin: 0;">Số tiền bằng chữ: ${tienBangChu}</p>
+                    ${htmlGhiChu}
+                </div>
+
+                <table style="width: 100%; font-size: 12px; page-break-inside: avoid;">
+                    <tr>
+                        <td style="width: 50%; vertical-align: top;">
+                            <div style="color: #283593; font-weight: bold; margin-bottom: 5px;">Chủ đơn vị</div>
+                            <div style="font-weight: bold; margin-bottom: 5px;">PHAN THANH SƠN</div>
+                            <div style="color: #333;">STK: Ngân hàng ACB – 41175687 – PHAN THANH SON</div>
+                            <div style="border-bottom: 1px solid #ddd; width: 80%; margin-top: 10px;"></div>
+                        </td>
+                        <td style="width: 50%; vertical-align: top;">
+                            <div style="color: #283593; font-weight: bold; margin-bottom: 5px;">Ngày lập báo giá</div>
+                            <div style="margin-bottom: 5px;">${ngayInPDF}</div>
+                            <div style="color: #333;">Lộc Ninh, Bình Phước</div>
+                            <div style="border-bottom: 1px solid #ddd; width: 80%; margin-top: 10px;"></div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        `;
+    },
+
+    viewOldPDF: function(index) {
+        const bg = this.currentHistory[index];
+        if(!bg) return;
+        
+        let itemsList = [];
+        try {
+            let rawData = bg.items;
+            if(typeof rawData === 'string') {
+                rawData = rawData.trim();
+                // Bóc lớp áo giáp nháy đơn
+                if (rawData.startsWith("'")) rawData = rawData.substring(1);
+                
+                rawData = rawData.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
+                itemsList = JSON.parse(rawData);
+            } else {
+                itemsList = rawData || [];
+            }
+        } catch(e) { itemsList = []; }
+
+        let ngayHienThi = bg.ngay;
+        if(String(ngayHienThi).includes('T')) {
+            ngayHienThi = new Date(ngayHienThi).toLocaleDateString('vi-VN');
+        }
+
+        const khachHang = document.getElementById('bg-khachhang').value.trim() || 'Khach_Hang';
+        const pdfContainer = document.getElementById('pdf-template-container');
+        pdfContainer.innerHTML = this.generatePDFHTML(khachHang, ngayHienThi, Number(bg.tongTien), itemsList, bg.ghiChu);
+        
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        pdfContainer.style.display = 'block';
+
+        var opt = {
+            margin:       0,
+            filename:     `BaoGia_${khachHang.replace(/ /g, "_")}_${ngayHienThi.replace(/\//g, "")}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, scrollY: 0 },
+            jsPDF:        { unit: 'in', format: 'A4', orientation: 'portrait' }
+        };
+
+        html2pdf().set(opt).from(pdfContainer).save().then(() => {
+            pdfContainer.style.display = 'none';
+            pdfContainer.innerHTML = '';
+        });
+    },
+
     saveAndExport: async function() {
         const khachHang = document.getElementById('bg-khachhang').value.trim();
         if (!khachHang) return alert("Vui lòng nhập tên khách hàng!");
@@ -237,103 +438,20 @@ const BaogiaModule = {
         });
 
         const btn = document.getElementById('btn-save-baogia');
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang tạo File PDF...';
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang tạo PDF...';
         btn.disabled = true;
 
         const dateObj = new Date();
-        const ngay = dateObj.toLocaleDateString('vi-VN');
+        const ngayInPDF = dateObj.toLocaleDateString('vi-VN');
+        const gioPhut = dateObj.toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'});
+        const ngayLuuDB = ngayInPDF + ' ' + gioPhut; 
         const maBG = "BG-" + dateObj.getTime().toString().slice(-6);
-        const tienBangChu = this.docSoThanhChu(tongTien);
 
         const pdfContainer = document.getElementById('pdf-template-container');
-        let trHtml = '';
-        for (let i = 0; i < 8; i++) {
-            let isEven = i % 2 !== 0; 
-            let bgColor = isEven ? '#f5f5f5' : '#ffffff';
-            let item = items[i];
+        pdfContainer.innerHTML = this.generatePDFHTML(khachHang, ngayInPDF, tongTien, items, ghiChu);
 
-            if (item) {
-                let thanhTien = item.qty * item.price;
-                trHtml += `
-                    <tr style="background-color: ${bgColor}; font-size: 13px; color: #555;">
-                        <td style="padding: 10px; text-align: center;">${i + 1}</td>
-                        <td style="padding: 10px; font-weight: bold;">${item.name}</td>
-                        <td style="padding: 10px; text-align: center;">${item.dvt}</td>
-                        <td style="padding: 10px; text-align: center;">${item.qty.toLocaleString('vi-VN')}</td>
-                        <td style="padding: 10px; text-align: right;">${item.price.toLocaleString('vi-VN')}</td>
-                        <td style="padding: 10px; text-align: right;">${thanhTien.toLocaleString('vi-VN')}</td>
-                    </tr>`;
-            } else {
-                trHtml += `
-                    <tr style="background-color: ${bgColor}; height: 38px;">
-                        <td style="padding: 10px; text-align: center; color: #999;">${i + 1}</td>
-                        <td></td><td></td><td></td><td></td><td></td>
-                    </tr>`;
-            }
-        }
-
-        pdfContainer.innerHTML = `
-            <div style="padding: 40px; font-family: 'Segoe UI', Arial, sans-serif; background: white;">
-                <div style="border-top: 8px solid #3f51b5; margin-bottom: 30px;"></div>
-                
-                <div style="margin-bottom: 40px;">
-                    <h2 style="color: #5c6bc0; font-size: 22px; margin: 0 0 5px 0; font-weight: 600;">ĐƠN VỊ THI CÔNG XÂY DỰNG THANH SƠN</h2>
-                    <p style="color: #777; font-size: 13px; margin: 0; line-height: 1.5;">
-                        362, Quốc Lộ 13<br>Lộc Ninh, Đồng Nai<br>Phone/Zalo: 0974031035
-                    </p>
-                </div>
-
-                <h1 style="color: #283593; font-size: 32px; font-weight: 700; margin-bottom: 30px;">Bảng giá các hạng mục thi công</h1>
-
-                <div style="margin-bottom: 20px;">
-                    <div style="font-weight: 700; font-size: 14px; color: #333;">Khách hàng</div>
-                    <div style="font-size: 14px; color: #777;">${khachHang}</div>
-                </div>
-
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
-                    <thead>
-                        <tr style="border-bottom: 1px solid #ddd; color: #283593; font-size: 14px;">
-                            <th style="padding: 12px 10px; text-align: center; width: 5%;">STT</th>
-                            <th style="padding: 12px 10px; text-align: left; width: 40%;">Nội dung</th>
-                            <th style="padding: 12px 10px; text-align: center; width: 10%;">ĐVT</th>
-                            <th style="padding: 12px 10px; text-align: center; width: 10%;">SL</th>
-                            <th style="padding: 12px 10px; text-align: right; width: 15%;">Đơn giá (*)</th>
-                            <th style="padding: 12px 10px; text-align: right; width: 20%;">Thành tiền</th>
-                        </tr>
-                    </thead>
-                    <tbody>${trHtml}</tbody>
-                </table>
-
-                <div style="text-align: right; padding: 20px 0; border-bottom: 1px solid #ddd; margin-bottom: 20px;">
-                    <span style="font-size: 28px; font-weight: bold; color: #e91e63;">${tongTien.toLocaleString('vi-VN')}</span>
-                </div>
-
-                <div style="font-size: 13px; color: #333; margin-bottom: 40px;">
-                    <p style="margin: 0 0 5px 0;">(*) Đơn giá chưa bao gồm thuế VAT</p>
-                    <p style="color: #283593; font-weight: bold; margin: 0;">Số tiền bằng chữ: ${tienBangChu}</p>
-                </div>
-
-                <table style="width: 100%; font-size: 13px;">
-                    <tr>
-                        <td style="width: 50%; vertical-align: top;">
-                            <div style="color: #283593; font-weight: bold; margin-bottom: 10px;">Chủ đơn vị</div>
-                            <div style="font-weight: bold; margin-bottom: 5px;">PHAN THANH SƠN</div>
-                            <div style="color: #333;">STK: Ngân hàng ACB – 41175687 – PHAN THANH SON</div>
-                            <div style="border-bottom: 1px solid #ddd; width: 80%; margin-top: 10px;"></div>
-                        </td>
-                        <td style="width: 50%; vertical-align: top;">
-                            <div style="color: #283593; font-weight: bold; margin-bottom: 10px;">Ngày lập báo giá</div>
-                            <div style="margin-bottom: 5px;">${ngay}</div>
-                            <div style="color: #333;">Lộc Ninh, Đồng Nai</div>
-                            <div style="border-bottom: 1px solid #ddd; width: 80%; margin-top: 10px;"></div>
-                        </td>
-                    </tr>
-                </table>
-            </div>
-        `;
-
-        const itemsString = encodeURIComponent(JSON.stringify(items));
-        const payload = [maBG, ngay, khachHang, tongTien, itemsString, ghiChu];
+        const itemsString = "'" + JSON.stringify(items);
+        const payload = [maBG, ngayLuuDB, khachHang, tongTien, itemsString, ghiChu];
         
         let res = await API.request('POST', 'saveBaoGia', 'BAO_GIA', payload);
         
@@ -344,22 +462,36 @@ const BaogiaModule = {
             return;
         }
 
+        window.scrollTo({ top: 0, behavior: 'instant' });
         pdfContainer.style.display = 'block';
+
         var opt = {
             margin:       0,
-            filename:     `BaoGia_${khachHang.replace(/ /g, "_")}_${ngay.replace(/\//g, "")}.pdf`,
+            filename:     `BaoGia_${khachHang.replace(/ /g, "_")}_${ngayInPDF.replace(/\//g, "")}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2 },
+            html2canvas:  { scale: 2, scrollY: 0 },
             jsPDF:        { unit: 'in', format: 'A4', orientation: 'portrait' }
         };
 
         html2pdf().set(opt).from(pdfContainer).save().then(() => {
             pdfContainer.style.display = 'none';
             pdfContainer.innerHTML = '';
-            alert("✅ Xuất Báo giá thành công! Đã lưu trữ an toàn trên Google Sheets.");
-            this.load(); 
-            btn.innerHTML = '<i class="bi bi-file-earmark-arrow-down me-2"></i>LƯU & XUẤT FILE PDF';
-            btn.disabled = false;
+            
+            btn.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>ĐÃ XUẤT THÀNH CÔNG';
+            btn.classList.replace('btn-primary', 'btn-success');
+            
+            const btnNew = document.getElementById('btn-new-baogia');
+            if(btnNew) btnNew.style.display = 'block'; 
+            
+            setTimeout(() => {
+                if(btn.classList.contains('btn-success')) {
+                    btn.innerHTML = '<i class="bi bi-file-earmark-arrow-down me-2"></i>LƯU ĐÈ & XUẤT LẠI';
+                    btn.classList.replace('btn-success', 'btn-primary');
+                    btn.disabled = false;
+                }
+            }, 3000);
+            
+            this.fetchHistory(khachHang);
         });
     }
 };
