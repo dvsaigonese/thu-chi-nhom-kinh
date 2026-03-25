@@ -1,6 +1,6 @@
 const API = {
     // 🔴 DÁN LINK WEB APP CỦA BẠN VÀO DÒNG DƯỚI NÀY 🔴
-    URL: "https://script.google.com/macros/s/AKfycbyijcgS6RkANDMopJ9ENEvsaPKWdP2bbK7BkgyxA6sg1Num1QAtbc6YNEfIEVuatku8Pg/exec",
+    URL: "https://script.google.com/macros/s/AKfycbzQXRcCipgEA0n4dK48h6K_b3nGhux8TzHGs_mklxNkca6dHACl5EZmfH_bYfAmdQnSAw/exec",
 
     request: async function(method, action, sheetName, payload = null, rowIndex = null) {
         let url = `${this.URL}?action=${action}&sheetName=${sheetName}`;

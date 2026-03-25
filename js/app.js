@@ -55,6 +55,10 @@ const App = {
                 headerTitle.innerText = 'Hồ Sơ Công Nợ';
                 BaocaoModule.load();
             }
+            if(pageId === 'baogia') {
+                headerTitle.innerText = 'Tạo Báo Giá PDF';
+                if(typeof BaogiaModule !== 'undefined') BaogiaModule.load();
+            }
         }
     }
 };
