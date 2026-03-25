@@ -1,10 +1,9 @@
 // js/modules/thuchi.js
 
 const ThuChiModule = {
-    // Lưu các list lấy từ sheet SETUP
-    Lists: { khachHang: [], doiTac: [], nhaCungCap: [], thuTypes: [], chiTypes: [] },
+    // Chỉ cần lưu Thu và Chi Types
+    Lists: { thuTypes: [], chiTypes: [] },
     
-    // Lưu State cho Phân trang & Bộ lọc
     isEventBound: false,
     filteredData: [],
     displayLimit: 10,
@@ -31,52 +30,28 @@ const ThuChiModule = {
             } else return;
         }
 
-        this.Lists.khachHang = setupData.map(r => r['NGUỒN TIỀN/KHÁCH']).filter(Boolean);
-        this.Lists.doiTac = setupData.map(r => r['ĐỐI TƯỢNG GIA CÔNG'] || r['ĐỐI TÁC GIA CÔNG']).filter(Boolean);
-        this.Lists.nhaCungCap = setupData.map(r => r['NGUỒN HÀNG/NCC']).filter(Boolean);
+        // Kéo danh sách phân loại thu chi từ cột mới
         this.Lists.thuTypes = setupData.map(r => r['PHÂN LOẠI THU']).filter(Boolean);
         this.Lists.chiTypes = setupData.map(r => r['PHÂN LOẠI CHI']).filter(Boolean);
+
+        // Đổ toàn bộ Phân loại vào Dropdown
+        const phanLoai = document.getElementById('tc-phanloai');
+        phanLoai.innerHTML = '<option value="">-- Bỏ qua cũng được --</option>';
+        
+        // Dùng Set để lọc trùng lặp tự động
+        let allTypes = [...new Set([...this.Lists.thuTypes, ...this.Lists.chiTypes])];
+        allTypes.forEach(i => {
+            phanLoai.innerHTML += `<option value="${i}">${i}</option>`;
+        });
     },
 
     bindEvents: function() {
-        const loaiChuThe = document.getElementById('tc-loai');
-        const listChuThe = document.getElementById('list-chuthe'); 
-        const inputChuThe = document.getElementById('tc-chuthe');
+        // Đã xóa phần bắt sự kiện của tc-loai cũ
         const phanLoai = document.getElementById('tc-phanloai');
-        
-        // 2 input tiền để xử lý khóa ô
         const inputThu = document.getElementById('tc-thu');
         const inputChi = document.getElementById('tc-chi');
 
-        loaiChuThe.addEventListener('change', (e) => {
-            let val = e.target.value;
-            listChuThe.innerHTML = ''; 
-            inputChuThe.value = ''; 
-            phanLoai.innerHTML = '<option value="">-- Chọn phân loại --</option>';
-            
-            // Mở lại cả 2 ô tiền khi đổi loại chủ thể
-            inputThu.disabled = false;
-            inputChi.disabled = false;
-
-            if (val === 'KhachHang') {
-                this.Lists.khachHang.forEach(i => listChuThe.innerHTML += `<option value="${i}">`);
-                this.Lists.thuTypes.forEach(i => phanLoai.innerHTML += `<option value="${i}">${i}</option>`);
-            } 
-            else if (val === 'DoiTac') {
-                this.Lists.doiTac.forEach(i => listChuThe.innerHTML += `<option value="${i}">`);
-                this.Lists.chiTypes.forEach(i => phanLoai.innerHTML += `<option value="${i}">${i}</option>`);
-            } 
-            else if (val === 'NhaCungCap') {
-                this.Lists.nhaCungCap.forEach(i => listChuThe.innerHTML += `<option value="${i}">`);
-                this.Lists.chiTypes.forEach(i => phanLoai.innerHTML += `<option value="${i}">${i}</option>`);
-            } 
-            else if (val === 'NoiBo') {
-                listChuThe.innerHTML = `<option value="Cậu Sơn / Nội bộ xưởng">`;
-                [...this.Lists.thuTypes, ...this.Lists.chiTypes].forEach(i => phanLoai.innerHTML += `<option value="${i}">${i}</option>`);
-            }
-        });
-
-        // XỬ LÝ KHÓA Ô THU / CHI
+        // XỬ LÝ KHÓA Ô THU / CHI THEO CHỮ ĐẦU TIÊN CỦA PHÂN LOẠI
         phanLoai.addEventListener('change', (e) => {
             let val = e.target.value;
             if (val.startsWith('Thu')) {
@@ -87,7 +62,6 @@ const ThuChiModule = {
                 inputThu.disabled = false; inputChi.disabled = false;
             }
         });
-
     },
 
     loadHistory: async function() {
@@ -117,34 +91,29 @@ const ThuChiModule = {
 
     // ================= BỘ LỌC ĐA NĂNG & THỐNG KÊ =================
     
-    // 1. Hàm phụ: Chuyển đổi ngày DD/MM/YYYY từ Sheet sang chuẩn của máy tính
     parseDateString: function(dateStr) {
         if (!dateStr) return null;
-        if (dateStr.includes('-')) return new Date(dateStr); // Nếu đã chuẩn YYYY-MM-DD
+        if (dateStr.includes('-')) return new Date(dateStr); 
         const parts = dateStr.split('/');
         if (parts.length === 3) {
-            // Javascript nhận tháng từ 0-11, nên phải trừ 1
             return new Date(parts[2], parts[1] - 1, parts[0]);
         }
         return new Date(dateStr);
     },
 
-    // 2. Hàm lọc chính thức
     applyFilters: function() {
         if(!App.State.thuChiData) return;
 
-        // Lấy điều kiện lọc
         const type = document.getElementById('filter-type').value;
         const txtKeyword = document.getElementById('filter-keyword').value.toLowerCase();
         const dateFromStr = document.getElementById('filter-date-from').value;
         const dateToStr = document.getElementById('filter-date-to').value;
 
-        // Xử lý mốc thời gian an toàn
         let dateFrom = dateFromStr ? new Date(dateFromStr) : null;
-        if (dateFrom) dateFrom.setHours(0, 0, 0, 0); // Lấy từ 0h00 sáng
+        if (dateFrom) dateFrom.setHours(0, 0, 0, 0); 
 
         let dateTo = dateToStr ? new Date(dateToStr) : null;
-        if (dateTo) dateTo.setHours(23, 59, 59, 999); // Lấy đến 23h59 tối
+        if (dateTo) dateTo.setHours(23, 59, 59, 999); 
 
         let tongThu = 0;
         let tongChi = 0;
@@ -153,12 +122,10 @@ const ThuChiModule = {
             let thu = parseFloat(row['Số tiền THU']) || 0;
             let chi = parseFloat(row['Số tiền CHI']) || 0;
 
-            // Kiểm tra Loại
             let matchType = true;
             if (type === 'THU') matchType = thu > 0;
             if (type === 'CHI') matchType = chi > 0;
 
-            // Kiểm tra Từ khóa
             let matchKeyword = true;
             if (txtKeyword !== '') {
                 let chuthe = (row['Chủ thể'] || '').toLowerCase();
@@ -170,7 +137,6 @@ const ThuChiModule = {
                                thuStr.includes(txtKeyword) || chiStr.includes(txtKeyword);
             }
 
-            // Kiểm tra Thời gian
             let matchDate = true;
             if (dateFrom || dateTo) {
                 let rowDate = this.parseDateString(row['Ngày']);
@@ -178,14 +144,12 @@ const ThuChiModule = {
                     if (dateFrom && rowDate < dateFrom) matchDate = false;
                     if (dateTo && rowDate > dateTo) matchDate = false;
                 } else {
-                    matchDate = false; // Dòng nào không có ngày coi như loại
+                    matchDate = false; 
                 }
             }
 
-            // Phải thỏa mãn CẢ 3 điều kiện mới được giữ lại
             let isMatch = matchType && matchKeyword && matchDate;
             
-            // Tính toán thống kê dựa trên những dòng ĐÃ ĐƯỢC LỌC
             if (isMatch) {
                 tongThu += thu;
                 tongChi += chi;
@@ -194,13 +158,11 @@ const ThuChiModule = {
             return isMatch;
         });
 
-        // Cập nhật lên màn hình
         this.updateStatsUI(tongThu, tongChi);
         this.displayLimit = 10;
         this.renderTable();
     },
 
-    // 3. Hàm phụ: Vẽ tiền lên Dashboard mini
     updateStatsUI: function(thu, chi) {
         const chenhLech = thu - chi;
         
@@ -210,27 +172,22 @@ const ThuChiModule = {
         const elChenhLech = document.getElementById('stat-chenh-lech');
         elChenhLech.innerText = Math.abs(chenhLech).toLocaleString('vi-VN') + ' đ';
         
-        // Cảnh báo màu sắc thông minh cho Cậu
         if (chenhLech > 0) {
             elChenhLech.className = 'fw-bold text-success text-truncate';
-            elChenhLech.innerText = '+' + elChenhLech.innerText; // Dư tiền
+            elChenhLech.innerText = '+' + elChenhLech.innerText; 
         } else if (chenhLech < 0) {
             elChenhLech.className = 'fw-bold text-danger text-truncate';
-            elChenhLech.innerText = '-' + elChenhLech.innerText; // Lõm vốn
+            elChenhLech.innerText = '-' + elChenhLech.innerText; 
         } else {
-            elChenhLech.className = 'fw-bold text-primary text-truncate'; // Hòa vốn
+            elChenhLech.className = 'fw-bold text-primary text-truncate'; 
         }
     },
 
-    // ================= XÓA BỘ LỌC =================
     resetFilters: function() {
-        // Trả các ô input về trạng thái trống hoặc mặc định
         document.getElementById('filter-date-from').value = '';
         document.getElementById('filter-date-to').value = '';
         document.getElementById('filter-type').value = 'ALL';
         document.getElementById('filter-keyword').value = '';
-        
-        // Gọi lại hàm lọc (lúc này các ô trống trơn nên nó sẽ tự động hiện ra TẤT CẢ)
         this.applyFilters();
     },
 
@@ -287,37 +244,38 @@ const ThuChiModule = {
     addTransaction: async function(e) {
         e.preventDefault();
         
-        // --- 1. KIỂM TRA ĐIỀU KIỆN BẮT BUỘC CHỈ DÀNH CHO TIỀN ---
         const thuVal = parseFloat(document.getElementById('tc-thu').value) || 0;
         const chiVal = parseFloat(document.getElementById('tc-chi').value) || 0;
 
         if (thuVal === 0 && chiVal === 0) {
-            alert("⚠️ Cậu ơi, ít nhất phải nhập số tiền THU hoặc CHI chứ!");
-            return; // Dừng luôn, không cho chạy tiếp
+            alert("⚠️ Bạn ơi, ít nhất phải nhập số tiền THU hoặc CHI chứ!");
+            return; 
         }
 
-        // --- 2. XỬ LÝ LẤY DỮ LIỆU AN TOÀN (Nếu bỏ trống vẫn chạy được) ---
         const btnAdd = document.getElementById('btn-add-tc');
         
-        // Xử lý Ngày (Nếu Cậu xóa ngày, tự mặc định lấy ngày hôm nay)
         let dateInput = document.getElementById('tc-ngay').value;
         if (!dateInput) {
-            // Lấy chuỗi YYYY-MM-DD của hôm nay
             dateInput = new Date().toISOString().split('T')[0]; 
         }
         const dateParts = dateInput.split('-');
         const dateFormatted = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
 
-        // Xử lý các ô Text / Dropdown
-        const loaiEl = document.getElementById('tc-loai');
-        const loaiTxt = loaiEl.selectedIndex > 0 ? loaiEl.options[loaiEl.selectedIndex].text : "";
         const chuTheTxt = document.getElementById('tc-chuthe').value.trim();
         const noiDungTxt = document.getElementById('tc-noidung').value.trim();
         const phanLoaiTxt = document.getElementById('tc-phanloai').value;
 
-        const payload = [dateFormatted, loaiTxt, chuTheTxt, noiDungTxt, phanLoaiTxt, thuVal, chiVal];
+        if (chuTheTxt !== "") {
+            let validNames = this.getValidPartners(); 
+            if (!validNames.includes(chuTheTxt)) {
+                alert(`⚠️ LỖI: Đối tác "${chuTheTxt}" chưa được đăng ký trong Cài Đặt!`);
+                return; 
+            }
+        }
 
-        // --- 3. ĐẨY LÊN GOOGLE SHEETS & RAM ---
+        // Đã gọt sạch payload, chỉ truyền đúng 6 Cột
+        const payload = [dateFormatted, chuTheTxt, noiDungTxt, phanLoaiTxt, thuVal, chiVal];
+
         btnAdd.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Đang ghi vào sổ cái...'; 
         btnAdd.disabled = true;
         
@@ -329,10 +287,10 @@ const ThuChiModule = {
             document.getElementById('tc-thu').disabled = false;
             document.getElementById('tc-chi').disabled = false;
             
+            // Xóa "Loại chủ thể" khỏi lệnh nhét vào RAM
             App.State.thuChiData.unshift({
                 _rowIndex: res.rowIndex, 
                 "Ngày": dateFormatted,
-                "Loại chủ thể": loaiTxt,
                 "Chủ thể": chuTheTxt,
                 "Nội dung": noiDungTxt,
                 "Phân loại": phanLoaiTxt,
@@ -341,7 +299,7 @@ const ThuChiModule = {
             });
 
             this.applyFilters(); 
-            
+            if(typeof DashboardModule !== 'undefined') DashboardModule.load(false);
         } else {
             alert('Lỗi: ' + res.message);
         }
@@ -350,21 +308,65 @@ const ThuChiModule = {
         btnAdd.disabled = false;
     },
 
+    getValidPartners: function() {
+        let validNames = ["Cậu Sơn / Nội bộ xưởng"];
+        if (App.State.setupData) {
+            App.State.setupData.forEach(r => {
+                if (r['CHỦ THỂ']) validNames.push(r['CHỦ THỂ']);
+            });
+        }
+        return validNames;
+    },
+
+    suggestNames: function() {
+        const inputVal = document.getElementById('tc-chuthe').value.toLowerCase();
+        const dropdown = document.getElementById('tc-chuthe-dropdown');
+        const allNames = this.getValidPartners();
+        
+        const filtered = allNames.filter(name => name.toLowerCase().includes(inputVal));
+        
+        if (filtered.length === 0) {
+            dropdown.style.display = 'none';
+            return;
+        }
+
+        let html = '';
+        filtered.forEach(name => {
+            html += `<li><button type="button" class="dropdown-item py-3 fw-bold text-teal border-bottom" onclick="ThuChiModule.selectName('${name}')">${name}</button></li>`;
+        });
+        
+        dropdown.innerHTML = html;
+        dropdown.style.display = 'block';
+    },
+
+    selectName: function(name) {
+        const input = document.getElementById('tc-chuthe');
+        input.value = name; 
+        document.getElementById('tc-chuthe-dropdown').style.display = 'none'; 
+        input.blur(); 
+    },
+
     deleteRow: async function(rowIndex) {
-        if(confirm(`⚠️ Cậu đang xóa dòng giao dịch số ${rowIndex}. Hành động này sẽ làm thay đổi quỹ.\nTiếp tục?`)) {
-            
-            // Lệnh API xóa ngầm
+        if(confirm(`⚠️ Bạn đang xóa dòng giao dịch số ${rowIndex}. Hành động này sẽ làm thay đổi quỹ.\nTiếp tục?`)) {
             let res = await API.request('POST', 'delete', 'THU_CHI', null, rowIndex);
             
             if(res.status === 'success') {
-                // XÓA TRÊN RAM
                 App.State.thuChiData = App.State.thuChiData.filter(r => r._rowIndex !== rowIndex);
-                
-                // Vẽ lại bảng ngay lập tức
                 this.applyFilters();
+                if(typeof DashboardModule !== 'undefined') DashboardModule.load(false);
             } else {
                 alert('Lỗi: ' + res.message);
             }
         }
     }
 };
+
+document.addEventListener('click', function(e) {
+    const input = document.getElementById('tc-chuthe');
+    const dropdown = document.getElementById('tc-chuthe-dropdown');
+    if (input && dropdown) {
+        if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    }
+});

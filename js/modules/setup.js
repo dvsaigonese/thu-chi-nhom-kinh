@@ -1,8 +1,8 @@
 // js/modules/setup.js
 
 const SetupModule = {
-    currentCategory: 'NGUỒN TIỀN/KHÁCH',
-    Headers: ["NGUỒN TIỀN/KHÁCH", "ĐỐI TÁC GIA CÔNG", "NGUỒN HÀNG/NCC", "PHÂN LOẠI THU", "PHÂN LOẠI CHI", "TÊN VẬT TƯ"],
+    currentCategory: 'CHỦ THỂ',
+    Headers: ["CHỦ THỂ", "PHÂN LOẠI THU", "PHÂN LOẠI CHI", "TÊN VẬT TƯ"],
 
     load: async function() {
         await this.fetchData();
@@ -162,7 +162,7 @@ const SetupModule = {
                 if (targetRow) targetRow[this.currentCategory] = newValue;
 
                 // NẾU LÀ ĐỔI TÊN KHÁCH/THỢ/NCC -> GỌI API ĐỔI TÊN Ở THU CHI
-                if (oldValue && (this.currentCategory.includes('KHÁCH') || this.currentCategory.includes('ĐỐI TÁC') || this.currentCategory.includes('NCC'))) {
+                if (oldValue && this.currentCategory === 'CHỦ THỂ') {
                     // Dùng await để ép nó chờ đổi tên xong mới đi tiếp
                     let renameRes = await API.request('POST', 'renamePartner', 'THU_CHI', {oldName: oldValue, newName: newValue});
                     if(renameRes.status === 'success') {

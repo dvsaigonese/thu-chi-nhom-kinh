@@ -1,99 +1,124 @@
 // js/modules/baocao.js
 
 const BaocaoModule = {
+    allPartners: [],
+    historyCache: {}, // Bộ nhớ đệm: Ai tải rồi thì lưu lại, không tải lại nữa
+
     load: async function() {
-        const inputList = document.getElementById('bc-list-chuthe');
-        const emptyState = document.getElementById('bc-empty-state');
-        const dashboard = document.getElementById('bc-dashboard');
-        
-        document.getElementById('bc-chuthe').value = '';
-        emptyState.style.display = 'block';
-        dashboard.style.display = 'none';
+        this.showList();
+        document.getElementById('bc-search-input').value = '';
+        const listContainer = document.getElementById('bc-partner-list');
 
-        // 1. Tải Sổ Thu Chi vào RAM (nếu chưa có)
-        if (!App.State.thuChiData) {
-            document.getElementById('bc-chuthe').disabled = true;
-            let tcRes = await API.request('GET', 'read', 'THU_CHI');
-            if(tcRes.status === 'success') {
-                App.State.thuChiData = tcRes.data.filter(r => r['Ngày'] || r['Chủ thể']).reverse();
-            }
-            document.getElementById('bc-chuthe').disabled = false;
-        }
-
-        // 2. Tải danh sách SETUP vào RAM (để lấy danh sách đối tác)
+        // CHỈ TẢI MỖI DANH BẠ (SETUP) RẤT NHẸ
         if (!App.State.setupData) {
+            listContainer.innerHTML = '<div class="text-center p-4 text-muted"><span class="spinner-border spinner-border-sm text-teal me-2"></span> Đang tải danh bạ...</div>';
             let stRes = await API.request('GET', 'read', 'SETUP');
-            if(stRes.status === 'success') {
-                App.State.setupData = stRes.data;
-            }
+            if(stRes.status === 'success') App.State.setupData = stRes.data;
         }
 
-        // 3. Đổ danh sách vào Dropdown cho Cậu dễ gõ
+        // Lấy danh sách tên và in ra
+        let partnersSet = new Set();
         if (App.State.setupData) {
-            inputList.innerHTML = '';
-            let partners = new Set(); // Dùng Set để lọc trùng lặp tự động
             App.State.setupData.forEach(r => {
-                if (r['NGUỒN TIỀN/KHÁCH']) partners.add(r['NGUỒN TIỀN/KHÁCH']);
-                if (r['ĐỐI TÁC GIA CÔNG']) partners.add(r['ĐỐI TÁC GIA CÔNG']);
-                if (r['NGUỒN HÀNG/NCC']) partners.add(r['NGUỒN HÀNG/NCC']);
-            });
-            partners.forEach(p => {
-                inputList.innerHTML += `<option value="${p}">`;
+                if (r['CHỦ THỂ']) partnersSet.add(r['CHỦ THỂ']);
             });
         }
+        this.allPartners = Array.from(partnersSet).sort();
+        this.renderPartnerList(this.allPartners);
     },
 
-    selectPartner: function() {
-        const selectedName = document.getElementById('bc-chuthe').value.trim();
-        const emptyState = document.getElementById('bc-empty-state');
-        const dashboard = document.getElementById('bc-dashboard');
+    renderPartnerList: function(listToRender) {
+        const container = document.getElementById('bc-partner-list');
+        let html = '';
+        const maxRender = 50;
+        const slicedList = listToRender.slice(0, maxRender);
 
-        if (!selectedName || !App.State.thuChiData) {
-            emptyState.style.display = 'block';
-            dashboard.style.display = 'none';
-            return;
+        slicedList.forEach(partner => {
+            html += `
+            <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3 border-bottom" onclick="BaocaoModule.openPartner('${partner}')">
+                <span class="fw-bold text-dark fs-6">${partner}</span>
+                <i class="bi bi-chevron-right text-muted"></i>
+            </button>`;
+        });
+
+        if (listToRender.length > maxRender) {
+            html += `<div class="text-center p-3 text-muted fs-7 bg-light">Và ${listToRender.length - maxRender} đối tác khác...<br><i>(Gõ từ khóa lên trên để tìm nhanh)</i></div>`;
         }
 
-        // LỌC MỌI GIAO DỊCH CỦA NGƯỜI NÀY
-        let history = App.State.thuChiData.filter(row => 
-            (row['Chủ thể'] || '').toLowerCase() === selectedName.toLowerCase()
-        );
+        if (html === '') {
+            html = `<div class="text-center p-5 text-muted">
+                        <i class="bi bi-search" style="font-size: 2rem; opacity: 0.5;"></i>
+                        <p class="mt-2">Không tìm thấy đối tác nào.</p>
+                    </div>`;
+        }
+        container.innerHTML = html;
+    },
 
-        if (history.length > 0) {
-            let tongThu = 0;
-            let tongChi = 0;
+    filterPartners: function() {
+        const keyword = document.getElementById('bc-search-input').value.toLowerCase();
+        const filteredList = this.allPartners.filter(p => p.toLowerCase().includes(keyword));
+        this.renderPartnerList(filteredList);
+    },
 
-            history.forEach(row => {
-                tongThu += parseFloat(row['Số tiền THU']) || 0;
-                tongChi += parseFloat(row['Số tiền CHI']) || 0;
-            });
+    showList: function() {
+        document.getElementById('bc-view-list').style.display = 'block';
+        document.getElementById('bc-view-detail').style.display = 'none';
+    },
 
-            let chenhLech = tongThu - tongChi;
+    // KHI BẤM VÀO 1 TÊN
+    openPartner: async function(partnerName) {
+        document.getElementById('bc-view-list').style.display = 'none';
+        document.getElementById('bc-view-detail').style.display = 'block';
+        document.getElementById('bc-name-label').innerText = partnerName;
 
-            // In số liệu ra màn hình
-            document.getElementById('bc-tong-thu').innerText = tongThu.toLocaleString('vi-VN') + ' đ';
-            document.getElementById('bc-tong-chi').innerText = tongChi.toLocaleString('vi-VN') + ' đ';
-            document.getElementById('bc-chenh-lech').innerText = Math.abs(chenhLech).toLocaleString('vi-VN') + ' đ';
-            
-            const elChenhLech = document.getElementById('bc-chenh-lech');
-            if (chenhLech > 0) {
-                elChenhLech.className = 'fw-bold text-success text-truncate';
-                elChenhLech.innerText = '+' + elChenhLech.innerText;
-            } else if (chenhLech < 0) {
-                elChenhLech.className = 'fw-bold text-danger text-truncate';
-                elChenhLech.innerText = '-' + elChenhLech.innerText;
-            } else {
-                elChenhLech.className = 'fw-bold text-primary text-truncate';
-            }
+        let history = [];
 
-            document.getElementById('bc-name-label').innerText = selectedName;
-            emptyState.style.display = 'none';
-            dashboard.style.display = 'block';
-
-            this.renderHistory(history);
+        // Kiểm tra xem đã từng tải người này chưa?
+        if (this.historyCache[partnerName]) {
+            // Lấy từ RAM ra xài luôn, tốc độ ánh sáng
+            history = this.historyCache[partnerName];
         } else {
-            alert("Chưa có giao dịch Thu Chi nào với đối tác: " + selectedName);
+            // Hiển thị loading trong bảng
+            document.getElementById('tbody-baocao').innerHTML = '<tr><td colspan="4" class="text-center p-5 text-muted"><span class="spinner-border spinner-border-sm text-teal me-2"></span> Đang kéo dữ liệu từ sổ quỹ...</td></tr>';
+            
+            // Gọi lệnh API mới viết để lấy đúng ông này
+            let res = await API.request('POST', 'readPartnerHistory', '', { partnerName: partnerName });
+            if (res.status === 'success') {
+                history = res.data;
+                this.historyCache[partnerName] = history; // Lưu vào Cache cho lần sau
+            } else {
+                alert("Lỗi tải lịch sử: " + res.message);
+                return;
+            }
         }
+
+        // TÍNH TOÁN TIỀN BẠC
+        let tongThu = 0;
+        let tongChi = 0;
+
+        history.forEach(row => {
+            tongThu += parseFloat(row['Số tiền THU']) || 0;
+            tongChi += parseFloat(row['Số tiền CHI']) || 0;
+        });
+
+        let chenhLech = tongThu - tongChi;
+
+        document.getElementById('bc-tong-thu').innerText = tongThu.toLocaleString('vi-VN') + ' đ';
+        document.getElementById('bc-tong-chi').innerText = tongChi.toLocaleString('vi-VN') + ' đ';
+        const elChenhLech = document.getElementById('bc-chenh-lech');
+        elChenhLech.innerText = Math.abs(chenhLech).toLocaleString('vi-VN') + ' đ';
+        
+        if (chenhLech > 0) {
+            elChenhLech.className = 'fw-bold text-success text-truncate';
+            elChenhLech.innerText = '+' + elChenhLech.innerText;
+        } else if (chenhLech < 0) {
+            elChenhLech.className = 'fw-bold text-danger text-truncate';
+            elChenhLech.innerText = '-' + elChenhLech.innerText;
+        } else {
+            elChenhLech.className = 'fw-bold text-primary text-truncate';
+        }
+
+        this.renderHistory(history);
     },
 
     renderHistory: function(history) {
@@ -110,13 +135,16 @@ const BaocaoModule = {
 
             html += `
             <tr>
-                <td class="ps-3 text-muted">${dateStr}</td>
-                <td class="text-truncate" style="max-width: 150px;">${row['Nội dung']}</td>
-                <td class="text-end text-success font-weight-bold-money">${thu}</td>
-                <td class="text-end text-danger font-weight-bold-money">${chi}</td>
+                <td class="ps-3 text-muted py-2">${dateStr}</td>
+                <td class="text-truncate py-2" style="max-width: 150px;">${row['Nội dung']}</td>
+                <td class="text-end text-success font-weight-bold-money py-2">${thu}</td>
+                <td class="text-end text-danger font-weight-bold-money py-2">${chi}</td>
             </tr>`;
         });
 
+        if (html === '') {
+            html = '<tr><td colspan="4" class="text-center p-5 text-muted">Chưa có giao dịch dòng tiền nào với đối tác này.</td></tr>';
+        }
         tbody.innerHTML = html;
     }
 };
