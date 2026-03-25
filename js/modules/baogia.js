@@ -4,6 +4,8 @@ const BaogiaModule = {
     rowCount: 0,
     currentHistory: [],
     historyDisplayCount: 5, 
+    latestPDFBlob: null, 
+    latestFileName: '',
 
     load: async function() {
         document.getElementById('bg-khachhang').value = '';
@@ -18,6 +20,7 @@ const BaogiaModule = {
             btnSave.classList.remove('btn-success');
             btnSave.classList.add('btn-primary');
             btnSave.disabled = false;
+            btnSave.onclick = function() { BaogiaModule.saveAndExport(); };
         }
         if (btnNew) btnNew.style.display = 'none';
 
@@ -156,7 +159,6 @@ const BaogiaModule = {
                 let parsed = (new Function("return " + str))();
                 return Array.isArray(parsed) ? parsed : [];
             } catch(e2) {
-                console.error("Dữ liệu vật tư bị hỏng hoàn toàn:", str);
                 return [];
             }
         }
@@ -186,7 +188,6 @@ const BaogiaModule = {
                     row.querySelector('.bg-item-price').value = item.price || '';
                 }
             });
-            alert(`✅ Đã nạp lại dữ liệu thành công!`);
         }
         this.updateTotal();
     },
@@ -263,10 +264,8 @@ const BaogiaModule = {
         return str.charAt(0).toUpperCase() + str.slice(1) + " đồng.";
     },
 
-    // --- BẢN NÂNG CẤP: MỞ KHÓA GIỚI HẠN VÀ CHỐNG ĐỨT TRANG (page-break-inside) ---
     generatePDFHTML: function(khachHang, ngayInPDF, tongTien, items, ghiChu) {
         let trHtml = '';
-        // THUẬT TOÁN: Lấy tối thiểu 8 dòng để giữ form đẹp, hoặc lấy tất cả nếu lớn hơn 8
         let totalRows = Math.max(8, items.length); 
 
         for (let i = 0; i < totalRows; i++) {
@@ -274,7 +273,6 @@ const BaogiaModule = {
             let bgColor = isEven ? '#f5f5f5' : '#ffffff';
             let item = items[i];
 
-            // Thêm page-break-inside: avoid vào TR để dòng không bao giờ bị cắt làm đôi
             if (item) {
                 let thanhTien = item.qty * item.price;
                 trHtml += `
@@ -310,7 +308,7 @@ const BaogiaModule = {
                 <div style="margin-bottom: 25px;">
                     <h2 style="color: #5c6bc0; font-size: 20px; margin: 0 0 5px 0; font-weight: 600;">ĐƠN VỊ THI CÔNG XÂY DỰNG THANH SƠN</h2>
                     <p style="color: #777; font-size: 12px; margin: 0; line-height: 1.5;">
-                        362, Quốc Lộ 13<br>Lộc Ninh, Bình Phước<br>Phone/Zalo: 0974031035
+                        362, Quốc Lộ 13<br>Lộc Ninh, Đồng Nai<br>Phone/Zalo: 0974031035
                     </p>
                 </div>
 
@@ -356,7 +354,7 @@ const BaogiaModule = {
                         <td style="width: 50%; vertical-align: top;">
                             <div style="color: #283593; font-weight: bold; margin-bottom: 5px;">Ngày lập báo giá</div>
                             <div style="margin-bottom: 5px;">${ngayInPDF}</div>
-                            <div style="color: #333;">Lộc Ninh, Bình Phước</div>
+                            <div style="color: #333;">Lộc Ninh, Đồng Nai</div>
                             <div style="border-bottom: 1px solid #ddd; width: 80%; margin-top: 10px;"></div>
                         </td>
                     </tr>
@@ -365,23 +363,7 @@ const BaogiaModule = {
         `;
     },
 
-    // --- HÀM DOWNLOAD THAY VÌ SHARE (Diệt gọn bệnh đen xì) ---
-    triggerDownload: function(pdfContainer, filename) {
-        var opt = {
-            margin:       0,
-            filename:     filename,
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, scrollY: 0 },
-            jsPDF:        { unit: 'in', format: 'A4', orientation: 'portrait' }
-        };
-
-        // GỌI THẲNG LỆNH SAVE - iPhone sẽ tự mở Tab xem PDF hoặc hiện Popup tải về mượt mà
-        html2pdf().set(opt).from(pdfContainer).save().then(() => {
-            pdfContainer.style.display = 'none';
-            pdfContainer.innerHTML = '';
-        });
-    },
-
+    // XEM LỊCH SỬ -> TẢI XUỐNG BÌNH THƯỜNG
     viewOldPDF: function(index) {
         const bg = this.currentHistory[index];
         if(!bg) return;
@@ -400,7 +382,19 @@ const BaogiaModule = {
         pdfContainer.style.display = 'block';
 
         const filename = `BaoGia_${khachHang.replace(/ /g, "_")}_${ngayHienThi.replace(/\//g, "")}.pdf`;
-        this.triggerDownload(pdfContainer, filename);
+        
+        var opt = {
+            margin:       0,
+            filename:     filename,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, scrollY: 0 },
+            jsPDF:        { unit: 'in', format: 'A4', orientation: 'portrait' }
+        };
+
+        html2pdf().set(opt).from(pdfContainer).save().then(() => {
+            pdfContainer.style.display = 'none';
+            pdfContainer.innerHTML = '';
+        });
     },
 
     saveAndExport: async function() {
@@ -454,23 +448,82 @@ const BaogiaModule = {
         pdfContainer.style.display = 'block';
 
         const filename = `BaoGia_${khachHang.replace(/ /g, "_")}_${ngayInPDF.replace(/\//g, "")}.pdf`;
-        this.triggerDownload(pdfContainer, filename);
+        
+        var opt = {
+            margin:       0,
+            filename:     filename,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, scrollY: 0 },
+            jsPDF:        { unit: 'in', format: 'A4', orientation: 'portrait' }
+        };
 
-        btn.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>ĐÃ XUẤT THÀNH CÔNG';
-        btn.classList.replace('btn-primary', 'btn-success');
+        // Đúc file Blob để chuẩn bị Share
+        html2pdf().set(opt).from(pdfContainer).output('blob').then((blob) => {
+            pdfContainer.style.display = 'none';
+            pdfContainer.innerHTML = '';
+            
+            BaogiaModule.latestPDFBlob = blob;
+            BaogiaModule.latestFileName = filename;
+            
+            btn.innerHTML = '<i class="bi bi-send-fill me-2"></i>GỬI QUA ZALO / TẢI VỀ';
+            btn.classList.replace('btn-primary', 'btn-success');
+            btn.disabled = false;
+            
+            // Kích hoạt Hàm Share Nâng Cao
+            btn.onclick = function() { BaogiaModule.shareLatestPDF(); };
+            
+            const btnNew = document.getElementById('btn-new-baogia');
+            if(btnNew) btnNew.style.display = 'block'; 
+            
+            this.fetchHistory(khachHang);
+        });
+    },
+
+    // --- HÀM SHARE: QUÉT THIẾT BỊ (Diệt bệnh đen xì trên Laptop) ---
+    shareLatestPDF: function() {
+        if (!this.latestPDFBlob) return;
         
-        const btnNew = document.getElementById('btn-new-baogia');
-        if(btnNew) btnNew.style.display = 'block'; 
+        const file = new File([this.latestPDFBlob], this.latestFileName, { type: 'application/pdf' });
+        // Quét xem có phải thiết bị di động không
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         
+        // Nếu là Mobile VÀ có hỗ trợ Share -> Nổ bảng Share
+        if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
+            navigator.share({
+                files: [file],
+                title: this.latestFileName,
+                text: 'Gửi báo giá từ Xưởng Thanh Sơn'
+            }).catch(e => {
+                console.log('Hủy share hoặc lỗi: ', e);
+                // Lỡ xui lỗi thì vẫn cho tải về
+                this.forceDownload(this.latestPDFBlob, this.latestFileName);
+            });
+        } else {
+            // Đang xài PC/Laptop -> Bỏ qua Share, tải thẳng luôn không lằng nhằng
+            this.forceDownload(this.latestPDFBlob, this.latestFileName);
+        }
+
+        // Tự trả nút về trạng thái cũ
         setTimeout(() => {
-            if(btn.classList.contains('btn-success')) {
+            const btn = document.getElementById('btn-save-baogia');
+            if (btn) {
                 btn.innerHTML = '<i class="bi bi-file-earmark-arrow-down me-2"></i>LƯU ĐÈ & XUẤT LẠI';
                 btn.classList.replace('btn-success', 'btn-primary');
-                btn.disabled = false;
+                btn.onclick = function() { BaogiaModule.saveAndExport(); };
             }
-        }, 3000);
-        
-        this.fetchHistory(khachHang);
+        }, 1500);
+    },
+
+    // Hàm ép tải trực tiếp (Dùng cho Laptop)
+    forceDownload: function(blob, filename) {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
     }
 };
 
