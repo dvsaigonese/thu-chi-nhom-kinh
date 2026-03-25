@@ -3,7 +3,7 @@
 const BaogiaModule = {
     rowCount: 0,
     currentHistory: [],
-    historyDisplayCount: 5, // Bộ đếm số lượng hiển thị lịch sử
+    historyDisplayCount: 5, 
 
     load: async function() {
         document.getElementById('bg-khachhang').value = '';
@@ -63,26 +63,22 @@ const BaogiaModule = {
         this.fetchHistory(name);
     },
 
-    // --- TÁCH HÀM LẤY LỊCH SỬ ---
     fetchHistory: async function(khachHang) {
         const container = document.getElementById('bg-history-container');
         const listEl = document.getElementById('bg-history-list');
-        
         listEl.innerHTML = '<div class="text-info p-2"><span class="spinner-border spinner-border-sm"></span> Đang lục tìm trong Sổ...</div>';
         container.style.display = 'block';
 
         try {
             let res = await API.request('POST', 'getBaoGiaHistory', 'BAO_GIA', { khachHang: khachHang });
-            
             if (res.status === 'error') {
                 listEl.innerHTML = `<div class="text-danger fw-bold p-2">Lỗi máy chủ: ${res.message}</div>`;
                 return;
             }
-            
             if (res.status === 'success' && res.data && res.data.length > 0) {
                 this.currentHistory = res.data;
-                this.historyDisplayCount = 5; // Reset về 5 mỗi khi tìm khách mới
-                this.renderHistoryList(); // Gọi hàm vẽ giao diện
+                this.historyDisplayCount = 5; 
+                this.renderHistoryList(); 
             } else {
                 listEl.innerHTML = '<div class="text-muted p-2"><i class="bi bi-info-circle"></i> Khách hàng này chưa có báo giá cũ.</div>';
             }
@@ -91,23 +87,18 @@ const BaogiaModule = {
         }
     },
 
-    // --- HÀM CHỊU TRÁCH NHIỆM VẼ GIAO DIỆN & TẠO NÚT XEM THÊM ---
     renderHistoryList: function() {
         const listEl = document.getElementById('bg-history-list');
         let html = '<div class="w-100">';
-        
-        // Chỉ lấy tối đa số lượng theo giới hạn
         let limit = Math.min(this.historyDisplayCount, this.currentHistory.length);
         
         for (let index = 0; index < limit; index++) {
             let bg = this.currentHistory[index];
             let ngayGio = bg.ngay;
-            
             if(ngayGio && String(ngayGio).includes('T')) {
                 let d = new Date(ngayGio);
                 ngayGio = d.toLocaleDateString('vi-VN') + ' ' + d.toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'});
             }
-            
             html += `
             <div class="w-100 d-flex justify-content-between align-items-center p-2 border rounded bg-white mb-2 shadow-sm">
                 <div>
@@ -123,7 +114,6 @@ const BaogiaModule = {
         }
         html += '</div>';
 
-        // Nếu vẫn còn báo giá bị ẩn, hiện nút "Xem thêm"
         let soLuongConLai = this.currentHistory.length - this.historyDisplayCount;
         if (soLuongConLai > 0) {
             html += `
@@ -133,11 +123,9 @@ const BaogiaModule = {
                 </button>
             </div>`;
         }
-
         listEl.innerHTML = html;
     },
 
-    // Khi bấm nút "Xem thêm", cộng dồn giới hạn lên 5 và vẽ lại
     loadMoreHistory: function() {
         this.historyDisplayCount += 5;
         this.renderHistoryList();
@@ -146,13 +134,31 @@ const BaogiaModule = {
     deleteQuote: async function(rowIndex) {
         if(!rowIndex) return alert("Lỗi: Không tìm thấy ID dòng để xóa.");
         if(!confirm("⚠️ Bạn có chắc chắn muốn xóa vĩnh viễn báo giá này khỏi lịch sử không?")) return;
-        
         let res = await API.request('POST', 'delete', 'BAO_GIA', null, rowIndex);
         if(res.status === 'success') {
             const khachHang = document.getElementById('bg-khachhang').value.trim();
             this.fetchHistory(khachHang);
         } else {
             alert("Lỗi xóa: " + res.message);
+        }
+    },
+
+    parseItemsData: function(rawItems) {
+        if (!rawItems) return [];
+        if (typeof rawItems !== 'string') return Array.isArray(rawItems) ? rawItems : [];
+        let str = String(rawItems).trim();
+        if (str.startsWith("'")) str = str.substring(1);
+        str = str.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
+        try {
+            return JSON.parse(str);
+        } catch(e) {
+            try {
+                let parsed = (new Function("return " + str))();
+                return Array.isArray(parsed) ? parsed : [];
+            } catch(e2) {
+                console.error("Dữ liệu vật tư bị hỏng hoàn toàn:", str);
+                return [];
+            }
         }
     },
 
@@ -164,24 +170,11 @@ const BaogiaModule = {
         document.getElementById('tbody-baogia').innerHTML = '';
         this.rowCount = 0;
         
-        let itemsList = [];
-        try {
-            let rawData = bg.items;
-            if (!rawData) itemsList = [];
-            else if (typeof rawData === 'object') itemsList = rawData; 
-            else {
-                rawData = String(rawData).trim();
-                if (rawData.startsWith("'")) rawData = rawData.substring(1);
-                rawData = rawData.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
-                try { itemsList = JSON.parse(rawData); } 
-                catch(e1) { itemsList = (new Function("return " + rawData))(); }
-            }
-        } catch(e) {
-            itemsList = [];
-        }
+        let itemsList = this.parseItemsData(bg.items);
         
-        if (!Array.isArray(itemsList) || itemsList.length === 0) {
+        if (itemsList.length === 0) {
             this.addRow(); 
+            alert("Báo giá này không có vật tư, hoặc dữ liệu đã bị hỏng!");
         } else {
             itemsList.forEach(item => {
                 this.addRow();
@@ -193,9 +186,9 @@ const BaogiaModule = {
                     row.querySelector('.bg-item-price').value = item.price || '';
                 }
             });
+            alert(`✅ Đã nạp lại dữ liệu thành công!`);
         }
         this.updateTotal();
-        alert(`✅ Đã nạp lại dữ liệu thành công!`);
     },
 
     addRow: function() {
@@ -204,7 +197,7 @@ const BaogiaModule = {
         const tr = document.createElement('tr');
         tr.id = `bg-row-${this.rowCount}`;
         tr.innerHTML = `
-            <td><input type="text" class="form-control form-control-sm bg-item-name" placeholder="Vd: Vách kính cường lực 8mm"></td>
+            <td><input type="text" class="form-control form-control-sm bg-item-name" placeholder="Vd: Kính 8mm"></td>
             <td><input type="text" class="form-control form-control-sm bg-item-dvt text-center" placeholder="m2"></td>
             <td><input type="number" class="form-control form-control-sm bg-item-qty text-center" placeholder="0" min="0" oninput="BaogiaModule.updateTotal()"></td>
             <td><input type="number" class="form-control form-control-sm bg-item-price text-end text-primary fw-bold" placeholder="0" min="0" oninput="BaogiaModule.updateTotal()"></td>
@@ -235,7 +228,6 @@ const BaogiaModule = {
         if (so === 0) return "Không đồng.";
         so = Math.abs(Math.round(so)); 
         const mangso = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
-        
         const dochangchuc = function(so, daydu) {
             let chuoi = ""; let chuc = Math.floor(so / 10); let donvi = so % 10;
             if (chuc > 1) { chuoi = " " + mangso[chuc] + " mươi"; if (donvi == 1) chuoi += " mốt"; } 
@@ -259,7 +251,6 @@ const BaogiaModule = {
             if (so > 0) { chuoi += docblock(so, daydu); }
             return chuoi;
         };
-        
         let chuoi = ""; let hauto = "";
         do {
             let ty = so % 1000000000; so = Math.floor(so / 1000000000);
@@ -267,34 +258,38 @@ const BaogiaModule = {
             else { chuoi = dochangtrieu(ty, false) + hauto + chuoi; }
             hauto = " tỷ";
         } while (so > 0);
-        
         let str = chuoi.trim();
         str = str.replace(/mươi một/g, 'mươi mốt');
         return str.charAt(0).toUpperCase() + str.slice(1) + " đồng.";
     },
 
+    // --- BẢN NÂNG CẤP: MỞ KHÓA GIỚI HẠN VÀ CHỐNG ĐỨT TRANG (page-break-inside) ---
     generatePDFHTML: function(khachHang, ngayInPDF, tongTien, items, ghiChu) {
         let trHtml = '';
-        for (let i = 0; i < 8; i++) {
+        // THUẬT TOÁN: Lấy tối thiểu 8 dòng để giữ form đẹp, hoặc lấy tất cả nếu lớn hơn 8
+        let totalRows = Math.max(8, items.length); 
+
+        for (let i = 0; i < totalRows; i++) {
             let isEven = i % 2 !== 0; 
             let bgColor = isEven ? '#f5f5f5' : '#ffffff';
             let item = items[i];
 
+            // Thêm page-break-inside: avoid vào TR để dòng không bao giờ bị cắt làm đôi
             if (item) {
                 let thanhTien = item.qty * item.price;
                 trHtml += `
-                    <tr style="background-color: ${bgColor}; font-size: 13px; color: #555;">
-                        <td style="padding: 8px; text-align: center;">${i + 1}</td>
-                        <td style="padding: 8px; font-weight: bold;">${item.name}</td>
-                        <td style="padding: 8px; text-align: center;">${item.dvt}</td>
-                        <td style="padding: 8px; text-align: center;">${item.qty.toLocaleString('vi-VN')}</td>
-                        <td style="padding: 8px; text-align: right;">${item.price.toLocaleString('vi-VN')}</td>
-                        <td style="padding: 8px; text-align: right;">${thanhTien.toLocaleString('vi-VN')}</td>
+                    <tr style="background-color: ${bgColor}; font-size: 13px; color: #555; page-break-inside: avoid;">
+                        <td style="padding: 10px; text-align: center;">${i + 1}</td>
+                        <td style="padding: 10px; font-weight: bold;">${item.name}</td>
+                        <td style="padding: 10px; text-align: center;">${item.dvt}</td>
+                        <td style="padding: 10px; text-align: center;">${item.qty.toLocaleString('vi-VN')}</td>
+                        <td style="padding: 10px; text-align: right;">${item.price.toLocaleString('vi-VN')}</td>
+                        <td style="padding: 10px; text-align: right;">${thanhTien.toLocaleString('vi-VN')}</td>
                     </tr>`;
             } else {
                 trHtml += `
-                    <tr style="background-color: ${bgColor}; height: 32px;">
-                        <td style="padding: 8px; text-align: center; color: #999;">${i + 1}</td>
+                    <tr style="background-color: ${bgColor}; height: 38px; page-break-inside: avoid;">
+                        <td style="padding: 10px; text-align: center; color: #999;">${i + 1}</td>
                         <td></td><td></td><td></td><td></td><td></td>
                     </tr>`;
             }
@@ -303,13 +298,13 @@ const BaogiaModule = {
         const tienBangChu = this.docSoThanhChu(tongTien);
         
         let htmlGhiChu = ghiChu ? `
-            <div style="margin-top: 10px; font-size: 13px; color: #333; padding: 10px; border: 1px dashed #ccc; background: #fafafa;">
+            <div style="margin-top: 10px; font-size: 13px; color: #333; padding: 10px; border: 1px dashed #ccc; background: #fafafa; page-break-inside: avoid;">
                 <b style="color: #283593;">Ghi chú:</b><br>${String(ghiChu).replace(/\n/g, '<br>')}
             </div>
         ` : '';
 
         return `
-            <div style="padding: 30px; font-family: 'Segoe UI', Arial, sans-serif; background: white; box-sizing: border-box;">
+            <div style="padding: 30px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: white; box-sizing: border-box;">
                 <div style="border-top: 8px solid #3f51b5; margin-bottom: 20px;"></div>
                 
                 <div style="margin-bottom: 25px;">
@@ -321,14 +316,14 @@ const BaogiaModule = {
 
                 <h1 style="color: #283593; font-size: 28px; font-weight: 700; margin-bottom: 20px;">Bảng giá các hạng mục thi công</h1>
 
-                <div style="margin-bottom: 15px;">
+                <div style="margin-bottom: 15px; page-break-inside: avoid;">
                     <div style="font-weight: 700; font-size: 13px; color: #333;">Khách hàng</div>
                     <div style="font-size: 13px; color: #777;">${khachHang}</div>
                 </div>
 
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
                     <thead>
-                        <tr style="border-bottom: 1px solid #ddd; color: #283593; font-size: 13px;">
+                        <tr style="border-bottom: 1px solid #ddd; color: #283593; font-size: 13px; page-break-inside: avoid;">
                             <th style="padding: 10px 8px; text-align: center; width: 5%;">STT</th>
                             <th style="padding: 10px 8px; text-align: left; width: 40%;">Nội dung</th>
                             <th style="padding: 10px 8px; text-align: center; width: 10%;">ĐVT</th>
@@ -340,11 +335,11 @@ const BaogiaModule = {
                     <tbody>${trHtml}</tbody>
                 </table>
 
-                <div style="text-align: right; padding: 10px 0; border-bottom: 1px solid #ddd; margin-bottom: 15px;">
+                <div style="text-align: right; padding: 10px 0; border-bottom: 1px solid #ddd; margin-bottom: 15px; page-break-inside: avoid;">
                     <span style="font-size: 24px; font-weight: bold; color: #e91e63;">${tongTien.toLocaleString('vi-VN')}</span>
                 </div>
 
-                <div style="font-size: 12px; color: #333; margin-bottom: 20px;">
+                <div style="font-size: 12px; color: #333; margin-bottom: 20px; page-break-inside: avoid;">
                     <p style="margin: 0 0 5px 0;">(*) Đơn giá chưa bao gồm thuế VAT</p>
                     <p style="color: #283593; font-weight: bold; margin: 0;">Số tiền bằng chữ: ${tienBangChu}</p>
                     ${htmlGhiChu}
@@ -370,25 +365,28 @@ const BaogiaModule = {
         `;
     },
 
+    // --- HÀM DOWNLOAD THAY VÌ SHARE (Diệt gọn bệnh đen xì) ---
+    triggerDownload: function(pdfContainer, filename) {
+        var opt = {
+            margin:       0,
+            filename:     filename,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, scrollY: 0 },
+            jsPDF:        { unit: 'in', format: 'A4', orientation: 'portrait' }
+        };
+
+        // GỌI THẲNG LỆNH SAVE - iPhone sẽ tự mở Tab xem PDF hoặc hiện Popup tải về mượt mà
+        html2pdf().set(opt).from(pdfContainer).save().then(() => {
+            pdfContainer.style.display = 'none';
+            pdfContainer.innerHTML = '';
+        });
+    },
+
     viewOldPDF: function(index) {
         const bg = this.currentHistory[index];
         if(!bg) return;
         
-        let itemsList = [];
-        try {
-            let rawData = bg.items;
-            if(typeof rawData === 'string') {
-                rawData = rawData.trim();
-                // Bóc lớp áo giáp nháy đơn
-                if (rawData.startsWith("'")) rawData = rawData.substring(1);
-                
-                rawData = rawData.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
-                itemsList = JSON.parse(rawData);
-            } else {
-                itemsList = rawData || [];
-            }
-        } catch(e) { itemsList = []; }
-
+        let itemsList = this.parseItemsData(bg.items);
         let ngayHienThi = bg.ngay;
         if(String(ngayHienThi).includes('T')) {
             ngayHienThi = new Date(ngayHienThi).toLocaleDateString('vi-VN');
@@ -401,18 +399,8 @@ const BaogiaModule = {
         window.scrollTo({ top: 0, behavior: 'instant' });
         pdfContainer.style.display = 'block';
 
-        var opt = {
-            margin:       0,
-            filename:     `BaoGia_${khachHang.replace(/ /g, "_")}_${ngayHienThi.replace(/\//g, "")}.pdf`,
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, scrollY: 0 },
-            jsPDF:        { unit: 'in', format: 'A4', orientation: 'portrait' }
-        };
-
-        html2pdf().set(opt).from(pdfContainer).save().then(() => {
-            pdfContainer.style.display = 'none';
-            pdfContainer.innerHTML = '';
-        });
+        const filename = `BaoGia_${khachHang.replace(/ /g, "_")}_${ngayHienThi.replace(/\//g, "")}.pdf`;
+        this.triggerDownload(pdfContainer, filename);
     },
 
     saveAndExport: async function() {
@@ -465,34 +453,24 @@ const BaogiaModule = {
         window.scrollTo({ top: 0, behavior: 'instant' });
         pdfContainer.style.display = 'block';
 
-        var opt = {
-            margin:       0,
-            filename:     `BaoGia_${khachHang.replace(/ /g, "_")}_${ngayInPDF.replace(/\//g, "")}.pdf`,
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, scrollY: 0 },
-            jsPDF:        { unit: 'in', format: 'A4', orientation: 'portrait' }
-        };
+        const filename = `BaoGia_${khachHang.replace(/ /g, "_")}_${ngayInPDF.replace(/\//g, "")}.pdf`;
+        this.triggerDownload(pdfContainer, filename);
 
-        html2pdf().set(opt).from(pdfContainer).save().then(() => {
-            pdfContainer.style.display = 'none';
-            pdfContainer.innerHTML = '';
-            
-            btn.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>ĐÃ XUẤT THÀNH CÔNG';
-            btn.classList.replace('btn-primary', 'btn-success');
-            
-            const btnNew = document.getElementById('btn-new-baogia');
-            if(btnNew) btnNew.style.display = 'block'; 
-            
-            setTimeout(() => {
-                if(btn.classList.contains('btn-success')) {
-                    btn.innerHTML = '<i class="bi bi-file-earmark-arrow-down me-2"></i>LƯU ĐÈ & XUẤT LẠI';
-                    btn.classList.replace('btn-success', 'btn-primary');
-                    btn.disabled = false;
-                }
-            }, 3000);
-            
-            this.fetchHistory(khachHang);
-        });
+        btn.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>ĐÃ XUẤT THÀNH CÔNG';
+        btn.classList.replace('btn-primary', 'btn-success');
+        
+        const btnNew = document.getElementById('btn-new-baogia');
+        if(btnNew) btnNew.style.display = 'block'; 
+        
+        setTimeout(() => {
+            if(btn.classList.contains('btn-success')) {
+                btn.innerHTML = '<i class="bi bi-file-earmark-arrow-down me-2"></i>LƯU ĐÈ & XUẤT LẠI';
+                btn.classList.replace('btn-success', 'btn-primary');
+                btn.disabled = false;
+            }
+        }, 3000);
+        
+        this.fetchHistory(khachHang);
     }
 };
 
