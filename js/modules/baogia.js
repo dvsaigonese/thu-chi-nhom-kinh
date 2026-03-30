@@ -182,9 +182,16 @@ const BaogiaModule = {
                 this.addRow();
                 const row = document.getElementById(`bg-row-${this.rowCount}`);
                 if(row) {
-                    row.querySelector('.bg-item-name').value = item.name || '';
+                    let nameInput = row.querySelector('.bg-item-name');
+                    nameInput.value = item.name || '';
+                    
+                    // BÙA CHÚ 1: Kích hoạt tự động nới rộng ô text khi nạp báo giá cũ
+                    setTimeout(() => {
+                        nameInput.style.height = 'auto';
+                        nameInput.style.height = nameInput.scrollHeight + 'px';
+                    }, 10);
+
                     row.querySelector('.bg-item-dvt').value = item.dvt || '';
-                    // Nếu là trống (công thợ), nạp lại vẫn là trống
                     row.querySelector('.bg-item-qty').value = (item.qty === "" || item.qty === null || item.qty === undefined) ? "" : item.qty;
                     row.querySelector('.bg-item-price').value = item.price || '';
                 }
@@ -198,12 +205,15 @@ const BaogiaModule = {
         const tbody = document.getElementById('tbody-baogia');
         const tr = document.createElement('tr');
         tr.id = `bg-row-${this.rowCount}`;
-        // Bỏ số 0 ở ô Số lượng, cho phép để trống
+        
+        // BÙA CHÚ 2: Đổi thẻ input thành textarea có oninput tự nới chiều cao
+        // BÙA CHÚ 3: Thêm ô Thành Tiền (disabled)
         tr.innerHTML = `
-            <td><input type="text" class="form-control form-control-sm bg-item-name" placeholder="Vd: Kính 8mm"></td>
-            <td><input type="text" class="form-control form-control-sm bg-item-dvt text-center" placeholder="Vd: m2"></td>
-            <td><input type="number" class="form-control form-control-sm bg-item-qty text-center" placeholder="Vd: 1.6" min="0" oninput="BaogiaModule.updateTotal()"></td>
+            <td><textarea class="form-control form-control-sm bg-item-name" placeholder="Vd: Kính 8mm" rows="1" style="resize: none; overflow: hidden;" oninput="this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'"></textarea></td>
+            <td><input type="text" class="form-control form-control-sm bg-item-dvt text-center" placeholder="m2"></td>
+            <td><input type="number" class="form-control form-control-sm bg-item-qty text-center" placeholder="-" min="0" oninput="BaogiaModule.updateTotal()"></td>
             <td><input type="number" class="form-control form-control-sm bg-item-price text-end text-primary fw-bold" placeholder="0" min="0" oninput="BaogiaModule.updateTotal()"></td>
+            <td><input type="text" class="form-control form-control-sm bg-item-total text-end text-success fw-bold bg-white" placeholder="0" disabled></td>
             <td class="text-center"><button class="btn btn-sm text-danger border-0" onclick="BaogiaModule.removeRow(${this.rowCount})"><i class="bi bi-trash"></i></button></td>
         `;
         tbody.appendChild(tr);
@@ -229,8 +239,18 @@ const BaogiaModule = {
             } else {
                 qty = parseFloat(qtyInput) || 0;
             }
-            total += (qty * price);
+            
+            // Tính thành tiền của từng dòng
+            let rowTotal = qty * price;
+            total += rowTotal;
+            
+            // Bắn số tiền vào ô Thành Tiền tương ứng
+            let totalInput = row.querySelector('.bg-item-total');
+            if (totalInput) {
+                totalInput.value = rowTotal > 0 ? rowTotal.toLocaleString('vi-VN') : "";
+            }
         });
+        
         document.getElementById('bg-tongtien').innerText = total.toLocaleString('vi-VN') + ' đ';
         document.getElementById('bg-tongtien').setAttribute('data-total', total);
     },
