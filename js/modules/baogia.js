@@ -184,7 +184,8 @@ const BaogiaModule = {
                 if(row) {
                     row.querySelector('.bg-item-name').value = item.name || '';
                     row.querySelector('.bg-item-dvt').value = item.dvt || '';
-                    row.querySelector('.bg-item-qty').value = item.qty || '';
+                    // Nếu là trống (công thợ), nạp lại vẫn là trống
+                    row.querySelector('.bg-item-qty').value = (item.qty === "" || item.qty === null || item.qty === undefined) ? "" : item.qty;
                     row.querySelector('.bg-item-price').value = item.price || '';
                 }
             });
@@ -197,10 +198,11 @@ const BaogiaModule = {
         const tbody = document.getElementById('tbody-baogia');
         const tr = document.createElement('tr');
         tr.id = `bg-row-${this.rowCount}`;
+        // Bỏ số 0 ở ô Số lượng, cho phép để trống
         tr.innerHTML = `
             <td><input type="text" class="form-control form-control-sm bg-item-name" placeholder="Vd: Kính 8mm"></td>
-            <td><input type="text" class="form-control form-control-sm bg-item-dvt text-center" placeholder="m2"></td>
-            <td><input type="number" class="form-control form-control-sm bg-item-qty text-center" placeholder="0" min="0" oninput="BaogiaModule.updateTotal()"></td>
+            <td><input type="text" class="form-control form-control-sm bg-item-dvt text-center" placeholder="Vd: m2"></td>
+            <td><input type="number" class="form-control form-control-sm bg-item-qty text-center" placeholder="Vd: 1.6" min="0" oninput="BaogiaModule.updateTotal()"></td>
             <td><input type="number" class="form-control form-control-sm bg-item-price text-end text-primary fw-bold" placeholder="0" min="0" oninput="BaogiaModule.updateTotal()"></td>
             <td class="text-center"><button class="btn btn-sm text-danger border-0" onclick="BaogiaModule.removeRow(${this.rowCount})"><i class="bi bi-trash"></i></button></td>
         `;
@@ -213,12 +215,20 @@ const BaogiaModule = {
         this.updateTotal();
     },
 
+    // --- TÍNH TỔNG CẢI TIẾN: Hiểu ngầm rỗng = 1 ---
     updateTotal: function() {
         let total = 0;
         const rows = document.querySelectorAll('#tbody-baogia tr');
         rows.forEach(row => {
-            let qty = parseFloat(row.querySelector('.bg-item-qty').value) || 0;
+            let qtyInput = row.querySelector('.bg-item-qty').value.trim();
             let price = parseFloat(row.querySelector('.bg-item-price').value) || 0;
+            
+            let qty = 0;
+            if (qtyInput === "") {
+                qty = 1; // Để trống tức là làm khoán/trọn gói -> tính là 1 để nhân Đơn Giá
+            } else {
+                qty = parseFloat(qtyInput) || 0;
+            }
             total += (qty * price);
         });
         document.getElementById('bg-tongtien').innerText = total.toLocaleString('vi-VN') + ' đ';
@@ -264,6 +274,7 @@ const BaogiaModule = {
         return str.charAt(0).toUpperCase() + str.slice(1) + " đồng.";
     },
 
+    // --- TẠO PDF THÔNG MINH ---
     generatePDFHTML: function(khachHang, ngayInPDF, tongTien, items, ghiChu) {
         let trHtml = '';
         let totalRows = Math.max(8, items.length); 
@@ -274,15 +285,23 @@ const BaogiaModule = {
             let item = items[i];
 
             if (item) {
-                let thanhTien = item.qty * item.price;
+                // Xác định xem đây có phải là Công thợ / Trọn gói không
+                let isLumpSum = (item.qty === "" || item.qty === null || item.qty === undefined);
+                let calcQty = isLumpSum ? 1 : parseFloat(item.qty) || 0;
+                let thanhTien = calcQty * (parseFloat(item.price) || 0);
+
+                let displayQty = isLumpSum ? "" : calcQty.toLocaleString('vi-VN');
+                let displayPrice = item.price ? parseFloat(item.price).toLocaleString('vi-VN') : "";
+                let displayThanhTien = thanhTien ? thanhTien.toLocaleString('vi-VN') : "";
+
                 trHtml += `
                     <tr style="background-color: ${bgColor}; font-size: 13px; color: #555; page-break-inside: avoid;">
                         <td style="padding: 10px; text-align: center;">${i + 1}</td>
                         <td style="padding: 10px; font-weight: bold;">${item.name}</td>
-                        <td style="padding: 10px; text-align: center;">${item.dvt}</td>
-                        <td style="padding: 10px; text-align: center;">${item.qty.toLocaleString('vi-VN')}</td>
-                        <td style="padding: 10px; text-align: right;">${item.price.toLocaleString('vi-VN')}</td>
-                        <td style="padding: 10px; text-align: right;">${thanhTien.toLocaleString('vi-VN')}</td>
+                        <td style="padding: 10px; text-align: center;">${item.dvt || ""}</td>
+                        <td style="padding: 10px; text-align: center;">${displayQty}</td>
+                        <td style="padding: 10px; text-align: right;">${displayPrice}</td>
+                        <td style="padding: 10px; text-align: right;">${displayThanhTien}</td>
                     </tr>`;
             } else {
                 trHtml += `
@@ -308,7 +327,7 @@ const BaogiaModule = {
                 <div style="margin-bottom: 25px;">
                     <h2 style="color: #5c6bc0; font-size: 20px; margin: 0 0 5px 0; font-weight: 600;">ĐƠN VỊ THI CÔNG XÂY DỰNG THANH SƠN</h2>
                     <p style="color: #777; font-size: 12px; margin: 0; line-height: 1.5;">
-                        362, Quốc Lộ 13<br>Lộc Ninh, Đồng Nai<br>Phone/Zalo: 0974031035
+                        362, Quốc Lộ 13<br>Lộc Ninh, Bình Phước<br>Phone/Zalo: 0974031035
                     </p>
                 </div>
 
@@ -354,7 +373,7 @@ const BaogiaModule = {
                         <td style="width: 50%; vertical-align: top;">
                             <div style="color: #283593; font-weight: bold; margin-bottom: 5px;">Ngày lập báo giá</div>
                             <div style="margin-bottom: 5px;">${ngayInPDF}</div>
-                            <div style="color: #333;">Lộc Ninh, Đồng Nai</div>
+                            <div style="color: #333;">Lộc Ninh, Bình Phước</div>
                             <div style="border-bottom: 1px solid #ddd; width: 80%; margin-top: 10px;"></div>
                         </td>
                     </tr>
@@ -363,7 +382,6 @@ const BaogiaModule = {
         `;
     },
 
-    // XEM LỊCH SỬ -> TẢI XUỐNG BÌNH THƯỜNG
     viewOldPDF: function(index) {
         const bg = this.currentHistory[index];
         if(!bg) return;
@@ -397,6 +415,7 @@ const BaogiaModule = {
         });
     },
 
+    // --- LƯU JSON RỖNG NẾU NGƯỜI DÙNG KHÔNG NHẬP SỐ LƯỢNG ---
     saveAndExport: async function() {
         const khachHang = document.getElementById('bg-khachhang').value.trim();
         if (!khachHang) return alert("Vui lòng nhập tên khách hàng!");
@@ -410,10 +429,11 @@ const BaogiaModule = {
         rows.forEach(row => {
             let name = row.querySelector('.bg-item-name').value.trim();
             if(name) {
+                let qtyInput = row.querySelector('.bg-item-qty').value.trim();
                 items.push({
                     name: name,
                     dvt: row.querySelector('.bg-item-dvt').value.trim(),
-                    qty: parseFloat(row.querySelector('.bg-item-qty').value) || 0,
+                    qty: qtyInput === "" ? "" : (parseFloat(qtyInput) || 0), // Lưu rỗng nếu không nhập
                     price: parseFloat(row.querySelector('.bg-item-price').value) || 0
                 });
             }
@@ -457,7 +477,6 @@ const BaogiaModule = {
             jsPDF:        { unit: 'in', format: 'A4', orientation: 'portrait' }
         };
 
-        // Đúc file Blob để chuẩn bị Share
         html2pdf().set(opt).from(pdfContainer).output('blob').then((blob) => {
             pdfContainer.style.display = 'none';
             pdfContainer.innerHTML = '';
@@ -469,7 +488,6 @@ const BaogiaModule = {
             btn.classList.replace('btn-primary', 'btn-success');
             btn.disabled = false;
             
-            // Kích hoạt Hàm Share Nâng Cao
             btn.onclick = function() { BaogiaModule.shareLatestPDF(); };
             
             const btnNew = document.getElementById('btn-new-baogia');
@@ -479,15 +497,12 @@ const BaogiaModule = {
         });
     },
 
-    // --- HÀM SHARE: QUÉT THIẾT BỊ (Diệt bệnh đen xì trên Laptop) ---
     shareLatestPDF: function() {
         if (!this.latestPDFBlob) return;
         
         const file = new File([this.latestPDFBlob], this.latestFileName, { type: 'application/pdf' });
-        // Quét xem có phải thiết bị di động không
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         
-        // Nếu là Mobile VÀ có hỗ trợ Share -> Nổ bảng Share
         if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
             navigator.share({
                 files: [file],
@@ -495,15 +510,12 @@ const BaogiaModule = {
                 text: 'Gửi báo giá từ Xưởng Thanh Sơn'
             }).catch(e => {
                 console.log('Hủy share hoặc lỗi: ', e);
-                // Lỡ xui lỗi thì vẫn cho tải về
                 this.forceDownload(this.latestPDFBlob, this.latestFileName);
             });
         } else {
-            // Đang xài PC/Laptop -> Bỏ qua Share, tải thẳng luôn không lằng nhằng
             this.forceDownload(this.latestPDFBlob, this.latestFileName);
         }
 
-        // Tự trả nút về trạng thái cũ
         setTimeout(() => {
             const btn = document.getElementById('btn-save-baogia');
             if (btn) {
@@ -514,7 +526,6 @@ const BaogiaModule = {
         }, 1500);
     },
 
-    // Hàm ép tải trực tiếp (Dùng cho Laptop)
     forceDownload: function(blob, filename) {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
