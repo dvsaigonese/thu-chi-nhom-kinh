@@ -297,7 +297,21 @@ const BaogiaModule = {
     // --- TẠO PDF THÔNG MINH ---
     generatePDFHTML: function(khachHang, ngayInPDF, tongTien, items, ghiChu) {
         let trHtml = '';
-        let totalRows = Math.max(8, items.length); 
+        let totalRows = Math.max(items.length); 
+
+        // THUẬT TOÁN CANH LỀ THẬP PHÂN CHO CỘT SỐ LƯỢNG
+        let maxDecimalPlaces = 0;
+        items.forEach(item => {
+            if (item && item.qty !== "" && item.qty !== null && item.qty !== undefined) {
+                let qtyStr = String(item.qty);
+                if (qtyStr.includes('.')) {
+                    let decimalLength = qtyStr.split('.')[1].length;
+                    if (decimalLength > maxDecimalPlaces) {
+                        maxDecimalPlaces = decimalLength;
+                    }
+                }
+            }
+        });
 
         for (let i = 0; i < totalRows; i++) {
             let isEven = i % 2 !== 0; 
@@ -310,24 +324,36 @@ const BaogiaModule = {
                 let calcQty = isLumpSum ? 1 : parseFloat(item.qty) || 0;
                 let thanhTien = calcQty * (parseFloat(item.price) || 0);
 
-                let displayQty = isLumpSum ? "" : calcQty.toLocaleString('vi-VN');
+                let displayQty = "";
+                if (!isLumpSum) {
+                    // Ép định dạng số lượng theo số lượng chữ số thập phân dài nhất đã tìm được
+                    displayQty = calcQty.toLocaleString('vi-VN', {
+                        minimumFractionDigits: maxDecimalPlaces,
+                        maximumFractionDigits: maxDecimalPlaces
+                    });
+                }
+
                 let displayPrice = item.price ? parseFloat(item.price).toLocaleString('vi-VN') : "";
                 let displayThanhTien = thanhTien ? thanhTien.toLocaleString('vi-VN') : "";
 
                 trHtml += `
                     <tr style="background-color: ${bgColor}; font-size: 13px; color: #555; page-break-inside: avoid;">
-                        <td style="padding: 10px; text-align: center;">${i + 1}</td>
-                        <td style="padding: 10px; font-weight: bold;">${item.name}</td>
-                        <td style="padding: 10px; text-align: center;">${item.dvt || ""}</td>
-                        <td style="padding: 10px; text-align: center;">${displayQty}</td>
-                        <td style="padding: 10px; text-align: right;">${displayPrice}</td>
-                        <td style="padding: 10px; text-align: right;">${displayThanhTien}</td>
+                        <td style="padding: 10px; text-align: center; border: 1px solid #bbb;">${i + 1}</td>
+                        <td style="padding: 10px; font-weight: bold; border: 1px solid #bbb;">${item.name}</td>
+                        <td style="padding: 10px; text-align: center; border: 1px solid #bbb;">${item.dvt || ""}</td>
+                        <td style="padding: 10px; text-align: right; border: 1px solid #bbb;">${displayQty}</td>
+                        <td style="padding: 10px; text-align: right; border: 1px solid #bbb;">${displayPrice}</td>
+                        <td style="padding: 10px; text-align: right; border: 1px solid #bbb;">${displayThanhTien}</td>
                     </tr>`;
             } else {
                 trHtml += `
-                    <tr style="background-color: ${bgColor}; font-size: 13px; color: #555; page-break-inside: avoid;">
-                        <td style="padding: 10px; text-align: center;">${i + 1}</td>
-                        <td></td><td></td><td></td><td></td><td></td>
+                    <tr style="background-color: ${bgColor}; height: 38px; page-break-inside: avoid;">
+                        <td style="padding: 10px; text-align: center; color: #999; border: 1px solid #bbb;">${i + 1}</td>
+                        <td style="border: 1px solid #bbb;"></td>
+                        <td style="border: 1px solid #bbb;"></td>
+                        <td style="border: 1px solid #bbb;"></td>
+                        <td style="border: 1px solid #bbb;"></td>
+                        <td style="border: 1px solid #bbb;"></td>
                     </tr>`;
             }
         }
@@ -360,20 +386,21 @@ const BaogiaModule = {
 
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
                     <thead>
-                        <tr style="border-bottom: 1px solid #ddd; color: #283593; font-size: 13px; page-break-inside: avoid;">
-                            <th style="padding: 10px 8px; text-align: center; width: 5%;">STT</th>
-                            <th style="padding: 10px 8px; text-align: left; width: 40%;">Nội dung</th>
-                            <th style="padding: 10px 8px; text-align: center; width: 10%;">ĐVT</th>
-                            <th style="padding: 10px 8px; text-align: center; width: 10%;">SL</th>
-                            <th style="padding: 10px 8px; text-align: right; width: 15%;">Đơn giá (*)</th>
-                            <th style="padding: 10px 8px; text-align: right; width: 20%;">Thành tiền</th>
+                        <tr style="background-color: #e8eaf6; color: #283593; font-size: 13px; page-break-inside: avoid;">
+                            <th style="padding: 10px 8px; text-align: center; width: 5%; border: 1px solid #bbb;">STT</th>
+                            <th style="padding: 10px 8px; text-align: center; width: 40%; border: 1px solid #bbb;">Quy cách</th>
+                            <th style="padding: 10px 8px; text-align: center; width: 10%; border: 1px solid #bbb;">ĐVT</th>
+                            <th style="padding: 10px 8px; text-align: center; width: 10%; border: 1px solid #bbb;">SL</th>
+                            <th style="padding: 10px 8px; text-align: center; width: 15%; border: 1px solid #bbb;">Đơn giá (*)</th>
+                            <th style="padding: 10px 8px; text-align: center; width: 20%; border: 1px solid #bbb;">Thành tiền</th>
                         </tr>
                     </thead>
                     <tbody>${trHtml}</tbody>
                 </table>
 
-                <div style="text-align: right; padding: 10px 0; border-bottom: 1px solid #ddd; margin-bottom: 15px; page-break-inside: avoid;">
+                <div style="text-align: right; padding: 10px 0; margin-bottom: 15px; page-break-inside: avoid;">
                     <span style="font-size: 24px; font-weight: bold; color: #e91e63;">${tongTien.toLocaleString('vi-VN')}</span>
+                    <div style="border-bottom: 1px solid #ddd; width: 100%; margin-top: 10px;"></div>
                 </div>
 
                 <div style="font-size: 12px; color: #333; margin-bottom: 20px; page-break-inside: avoid;">
