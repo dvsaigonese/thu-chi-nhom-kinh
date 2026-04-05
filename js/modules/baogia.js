@@ -210,7 +210,7 @@ const BaogiaModule = {
         // BÙA CHÚ 3: Thêm ô Thành Tiền (disabled)
         tr.innerHTML = `
             <td><textarea class="form-control form-control-sm bg-item-name" placeholder="Vd: Kính 8mm" rows="1" style="resize: none; overflow: hidden;" oninput="this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'"></textarea></td>
-            <td><input type="text" class="form-control form-control-sm bg-item-dvt text-center" placeholder="m2"></td>
+            <td><input type="text" class="form-control form-control-sm bg-item-dvt text-center" placeholder="Vd: m2"></td>
             <td><input type="number" class="form-control form-control-sm bg-item-qty text-center" placeholder="-" min="0" oninput="BaogiaModule.updateTotal()"></td>
             <td><input type="number" class="form-control form-control-sm bg-item-price text-end text-primary fw-bold" placeholder="0" min="0" oninput="BaogiaModule.updateTotal()"></td>
             <td><input type="text" class="form-control form-control-sm bg-item-total text-end text-success fw-bold bg-white" placeholder="0" disabled></td>
@@ -325,8 +325,8 @@ const BaogiaModule = {
                     </tr>`;
             } else {
                 trHtml += `
-                    <tr style="background-color: ${bgColor}; height: 38px; page-break-inside: avoid;">
-                        <td style="padding: 10px; text-align: center; color: #999;">${i + 1}</td>
+                    <tr style="background-color: ${bgColor}; font-size: 13px; color: #555; page-break-inside: avoid;">
+                        <td style="padding: 10px; text-align: center;">${i + 1}</td>
                         <td></td><td></td><td></td><td></td><td></td>
                     </tr>`;
             }
@@ -347,7 +347,7 @@ const BaogiaModule = {
                 <div style="margin-bottom: 25px;">
                     <h2 style="color: #5c6bc0; font-size: 20px; margin: 0 0 5px 0; font-weight: 600;">ĐƠN VỊ THI CÔNG XÂY DỰNG THANH SƠN</h2>
                     <p style="color: #777; font-size: 12px; margin: 0; line-height: 1.5;">
-                        362, Quốc Lộ 13<br>Lộc Ninh, Bình Phước<br>Phone/Zalo: 0974031035
+                        362, Quốc Lộ 13<br>Lộc Ninh, Đồng Nai<br>Phone/Zalo: 0974031035
                     </p>
                 </div>
 
@@ -393,7 +393,7 @@ const BaogiaModule = {
                         <td style="width: 50%; vertical-align: top;">
                             <div style="color: #283593; font-weight: bold; margin-bottom: 5px;">Ngày lập báo giá</div>
                             <div style="margin-bottom: 5px;">${ngayInPDF}</div>
-                            <div style="color: #333;">Lộc Ninh, Bình Phước</div>
+                            <div style="color: #333;">Lộc Ninh, Đồng Nai</div>
                             <div style="border-bottom: 1px solid #ddd; width: 80%; margin-top: 10px;"></div>
                         </td>
                     </tr>
